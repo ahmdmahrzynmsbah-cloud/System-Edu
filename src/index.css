@@ -1,0 +1,249 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&family=Alex+Brush&family=Caveat:wght@600&family=Mrs+Saint+Delafield&family=Herr+Von+Muellerhoff&family=Pinyon+Script&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Slide up and fade keyframes for subtle high craft transitions */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+@keyframes scanline {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+
+.animate-scanline {
+  animation: scanline 3s linear infinite;
+}
+
+/* Completely hide all scrollbars globally but keep normal scrolling behavior */
+* {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important;  /* IE and Edge */
+}
+*::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari and Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Custom smooth transition for theme switching */
+.theme-transition, 
+.theme-transition *, 
+.theme-transition ::before, 
+.theme-transition ::after {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 350ms;
+}
+
+/* Automatic Dark Mode theme styles */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #070d19 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Base background overrides */
+.dark .bg-\[\#F4F6F8\],
+.dark .bg-\[\#F4F6F8\]\/80,
+.dark .bg-\[\#F4F6F8\]\/90 {
+  background-color: #070d19 !important;
+}
+
+/* Default dark text color override */
+.dark .text-\[\#1A1A2E\] {
+  color: #e2e8f0 !important;
+}
+
+/* White cards became deep dark slate */
+.dark .bg-white,
+.dark .bg-white\/80,
+.dark .bg-white\/90 {
+  background-color: #111c2a !important;
+  color: #e2e8f0 !important;
+}
+
+/* Border overrides */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-gray-50,
+.dark .border-gray-150 {
+  border-color: #1e2d42 !important;
+}
+
+/* Slate background elements (inputs, search bar, legend, etc.) */
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/80,
+.dark .bg-slate-55\/10,
+.dark .bg-slate-100,
+.dark .bg-gray-50,
+.dark .bg-gray-50\/50,
+.dark .bg-slate-50\/70,
+.dark .bg-slate-55\/5,
+.dark .bg-slate-50\/20,
+.dark .bg-sky-50\/25,
+.dark .bg-sky-50\/30 {
+  background-color: #152438 !important;
+}
+
+/* Custom cards / badges */
+.dark .bg-emerald-50\/70,
+.dark .bg-emerald-50\/20,
+.dark .bg-emerald-55\/10 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+.dark .bg-rose-50\/70,
+.dark .bg-rose-50\/20,
+.dark .bg-rose-50\/25,
+.dark .bg-rose-55\/10 {
+  background-color: rgba(244, 63, 94, 0.1) !important;
+}
+.dark .bg-indigo-50\/70,
+.dark .bg-indigo-55\/10 {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+}
+.dark .bg-sky-55\/10 {
+  background-color: rgba(14, 165, 233, 0.1) !important;
+}
+
+/* Form input elements */
+.dark input[type="text"],
+.dark input[type="number"],
+.dark input[type="date"],
+.dark input[type="tel"],
+.dark select,
+.dark textarea {
+  background-color: #162438 !important;
+  border-color: #243b56 !important;
+  color: #f1f5f9 !important;
+}
+
+.dark input[type="text"]:focus,
+.dark input[type="number"]:focus,
+.dark input[type="date"]:focus,
+.dark input[type="tel"]:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #1A7FAA !important;
+  box-shadow: 0 0 0 2px rgba(26, 127, 170, 0.25) !important;
+}
+
+/* Placeholders */
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Headings and primary text */
+.dark .text-slate-700,
+.dark .text-gray-700,
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-950,
+.dark .text-gray-800,
+.dark .text-gray-900,
+.dark .text-slate-900\/90 {
+  color: #f1f5f9 !important;
+}
+
+/* Secondary/muted text */
+.dark .text-slate-500,
+.dark .text-slate-600,
+.dark .text-gray-500,
+.dark .text-gray-600,
+.dark .text-slate-500\/80 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-slate-400,
+.dark .text-gray-400 {
+  color: #64748b !important;
+}
+
+/* Hover effects */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-slate-50\/80:hover {
+  background-color: #1c304a !important;
+}
+
+/* Aside / Sidebar overrides */
+.dark aside {
+  background-color: #0c1827 !important;
+  border-left-color: #1a2c42 !important;
+}
+.dark aside .bg-\[\#0a4d75\] {
+  background-color: #09131f !important;
+}
+.dark aside .bg-\[\#073c5dd0\] {
+  background-color: #09131f !important;
+}
+
+/* Header */
+.dark header {
+  background-color: #111c2a !important;
+  border-bottom-color: #1e2d42 !important;
+}
+
+/* Tables styling */
+.dark th {
+  background-color: #162438 !important;
+  color: #f1f5f9 !important;
+}
+.dark td {
+  border-bottom-color: #1e2d42 !important;
+}
+.dark tr:hover {
+  background-color: rgba(22, 36, 56, 0.3) !important;
+}
+
+/* Custom buttons */
+.dark .bg-slate-50\/70,
+.dark .bg-slate-55\/10 {
+  background-color: #162438 !important;
+}
+
+/* Recharts Tooltip Customization */
+.dark .recharts-default-tooltip {
+  background-color: #111c2a !important;
+  border-color: #1e2d42 !important;
+}
+.dark .recharts-tooltip-item {
+  color: #f1f5f9 !important;
+}

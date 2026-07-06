@@ -1,0 +1,8 @@
+{
+  "name": "سيستم FOX لادارة السناتر اللتعليمية",
+  "description": "نظام إدارة وعمليات للمعلم لمتابعة الحضور، الغياب، رصد الدرجات، كشوف النتائج، الرسوم المدرسية وبث الإخطارات لأولياء الأمور",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
