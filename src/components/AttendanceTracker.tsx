@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Student, ClassRoom, Attendance } from '../types';
 import { samsDb } from '../utils/db';
-import { CheckCheck, AlertCircle, Scan, UserCheck, Calendar, RotateCcw, Search, ShieldAlert, Wifi, Check, X } from 'lucide-react';
+import { CheckCheck, AlertCircle, Scan, UserCheck, Calendar, RotateCcw, Search, ShieldAlert, Wifi, Check, X, CheckCircle2, Trash2 } from 'lucide-react';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 const playSuccessBeep = () => {
@@ -54,6 +54,12 @@ export default function AttendanceTracker() {
   });
   
   const [selectedClass, setSelectedClass] = useState('all');
+  
+  // Custom alerts/modals
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [showAbsentConfirm, setShowAbsentConfirm] = useState<Student[] | null>(null);
+
   const [recentScans, setRecentScans] = useState<Array<{
     student: Student;
     timestamp: string;
@@ -135,8 +141,10 @@ export default function AttendanceTracker() {
   }, [students, selectedClass]);
 
   const markUnscannedAsAbsent = () => {
+    setSuccessMsg('');
+    setErrorMsg('');
     if (selectedClass === 'all') {
-      alert("يرجى اختيار مجموعة محددة أولاً لتسجيل الغياب.");
+      setErrorMsg("يرجى اختيار مجموعة محددة أولاً لتسجيل الغياب.");
       return;
     }
     
@@ -147,16 +155,21 @@ export default function AttendanceTracker() {
     });
 
     if (unscanned.length === 0) {
-      alert("جميع طلاب هذه المجموعة تم تحضيرهم اليوم.");
+      setErrorMsg("جميع طلاب هذه المجموعة تم تحضيرهم اليوم.");
       return;
     }
 
-    if (window.confirm(`هل أنت متأكد من تسجيل غياب لـ ${unscanned.length} طالب/طالبة في هذا اليوم؟`)) {
-      unscanned.forEach(s => {
+    setShowAbsentConfirm(unscanned);
+  };
+
+  const confirmAbsent = () => {
+    if (showAbsentConfirm) {
+      showAbsentConfirm.forEach(s => {
         samsDb.saveAttendance(s.id, s.class_id, selectedDate, 'absent');
       });
       loadData();
-      alert("تم تسجيل الغياب بنجاح.");
+      setSuccessMsg("تم تسجيل الغياب بنجاح.");
+      setShowAbsentConfirm(null);
     }
   };
 
@@ -192,6 +205,25 @@ export default function AttendanceTracker() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
+        {/* Alerts */}
+        <div className="lg:col-span-3">
+          {successMsg && (
+            <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl border border-emerald-100 flex items-center gap-2 font-medium mb-2">
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+              {successMsg}
+            </div>
+          )}
+          {errorMsg && (
+            <div className="bg-rose-50 text-rose-700 p-4 rounded-xl border border-rose-100 flex items-center justify-between font-medium mb-2">
+              <div className="flex items-center gap-2">
+                <X className="w-5 h-5 shrink-0" />
+                {errorMsg}
+              </div>
+              <button onClick={() => setErrorMsg('')} className="text-rose-500 hover:text-rose-700"><X className="w-4 h-4"/></button>
+            </div>
+          )}
+        </div>
+
         {/* Right side: Real-time scan feed */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col h-[500px]">
@@ -383,6 +415,30 @@ export default function AttendanceTracker() {
 
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showAbsentConfirm && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">تأكيد الغياب</h3>
+              <p className="text-sm text-slate-500 mb-6">هل أنت متأكد من تسجيل غياب لـ {showAbsentConfirm.length} طالب/طالبة في هذا اليوم؟</p>
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setShowAbsentConfirm(null)} className="px-5 py-2 text-slate-500 font-semibold hover:bg-slate-50 rounded-xl transition-colors">إلغاء</button>
+                <button onClick={confirmAbsent} className="px-5 py-2 bg-red-500 text-white font-bold rounded-xl shadow-md hover:bg-red-600 transition-colors">نعم، سجل الغياب</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

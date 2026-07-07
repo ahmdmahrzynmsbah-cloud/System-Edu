@@ -30,7 +30,7 @@ export default function SettingsManager({
   const isWpAllowed = isWhatsappGatewayEnabledForTenant();
 
   // State variables for customization
-  const [appName, setAppName] = useState(() => getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية'));
+  const [appName, setAppName] = useState(() => getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
   const [appLogo, setAppLogo] = useState(() => getTenantSetting('sams_custom_app_logo_v2', 'F'));
   const [headerTitle, setHeaderTitle] = useState(() => getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة للمعلم'));
   const [headerSubtitle, setHeaderSubtitle] = useState(() => getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -127,7 +127,7 @@ export default function SettingsManager({
   };
 
   const confirmResetDefaults = () => {
-    setAppName('سيستم FOX لادارة السناتر التعليمية');
+    setAppName('Fox System');
     setAppLogo('F');
     setHeaderTitle('المنصة التعليمية المتكاملة');
     setHeaderSubtitle('بوابة التحكم الإدارية والحصص الأكاديمية');
@@ -219,7 +219,7 @@ export default function SettingsManager({
                   type="text"
                   value={appName}
                   onChange={(e) => setAppName(e.target.value)}
-                  placeholder="سيستم FOX لادارة السناتر التعليمية"
+                  placeholder="Fox System"
                   className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-lg text-right outline-none focus:border-[#0D5C8C] shadow-3xs"
                   required
                 />

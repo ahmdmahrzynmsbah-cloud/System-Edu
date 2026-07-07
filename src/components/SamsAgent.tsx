@@ -28,7 +28,7 @@ interface SamsAgentProps {
 
 export default function SamsAgent({ onNavigateToTab, onRefreshData }: SamsAgentProps) {
   const [input, setInput] = useState('');
-  const sysName = getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية');
+  const sysName = getTenantSetting('sams_custom_app_name_v2', 'Fox System');
 
   const [messages, setMessages] = useState<Message[]>([
     {

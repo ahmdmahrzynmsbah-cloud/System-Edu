@@ -13,7 +13,7 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
         manifest: {
-          name: 'سيستم FOX لادارة السناتر التعليمية',
+          name: 'Fox System لادارة السناتر التعليمية',
           short_name: 'FOX System',
           description: 'المنصة التعليمية المتكاملة للمعلم',
           theme_color: '#1A7FAA',

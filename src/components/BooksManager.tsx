@@ -17,6 +17,10 @@ export default function BooksManager() {
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Confirm Delete states
+  const [bookToDelete, setBookToDelete] = useState<string | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
+
   // Forms
   const [bookForm, setBookForm] = useState({
     id: '',
@@ -81,9 +85,14 @@ export default function BooksManager() {
   };
 
   const handleDeleteBook = (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه المذكرة؟ ستظل المدفوعات المسجلة لها موجودة.')) {
-      samsDb.deleteBook(id);
+    setBookToDelete(id);
+  };
+
+  const confirmDeleteBook = () => {
+    if (bookToDelete) {
+      samsDb.deleteBook(bookToDelete);
       loadData();
+      setBookToDelete(null);
     }
   };
 
@@ -126,9 +135,14 @@ export default function BooksManager() {
   };
 
   const handleDeletePayment = (id: string) => {
-    if (confirm('هل أنت متأكد من حذف سجل تسليم المذكرة هذا؟')) {
-      samsDb.deleteBookPayment(id);
+    setPaymentToDelete(id);
+  };
+
+  const confirmDeletePayment = () => {
+    if (paymentToDelete) {
+      samsDb.deleteBookPayment(paymentToDelete);
       loadData();
+      setPaymentToDelete(null);
     }
   };
 
@@ -433,6 +447,54 @@ export default function BooksManager() {
                   <button type="submit" className="px-6 py-2.5 bg-[#1A7FAA] text-white rounded-xl text-sm font-bold shadow-md hover:bg-[#0D5C8C]">حفظ السجل</button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Book Confirmation Modal */}
+      <AnimatePresence>
+        {bookToDelete && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">تأكيد الحذف</h3>
+              <p className="text-sm text-slate-500 mb-6">هل أنت متأكد من حذف هذه المذكرة؟ ستظل المدفوعات المسجلة لها موجودة.</p>
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setBookToDelete(null)} className="px-5 py-2 text-slate-500 font-semibold hover:bg-slate-50 rounded-xl transition-colors">إلغاء</button>
+                <button onClick={confirmDeleteBook} className="px-5 py-2 bg-red-500 text-white font-bold rounded-xl shadow-md hover:bg-red-600 transition-colors">نعم، احذف المذكرة</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Payment Confirmation Modal */}
+      <AnimatePresence>
+        {paymentToDelete && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">تأكيد الحذف</h3>
+              <p className="text-sm text-slate-500 mb-6">هل أنت متأكد من حذف سجل تسليم المذكرة هذا؟</p>
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setPaymentToDelete(null)} className="px-5 py-2 text-slate-500 font-semibold hover:bg-slate-50 rounded-xl transition-colors">إلغاء</button>
+                <button onClick={confirmDeletePayment} className="px-5 py-2 bg-red-500 text-white font-bold rounded-xl shadow-md hover:bg-red-600 transition-colors">نعم، احذف السجل</button>
+              </div>
             </motion.div>
           </div>
         )}

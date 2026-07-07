@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Barcode from './Barcode';
 
 export default function StudentBarcodes() {
-  const sysName = getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية');
+  const sysName = getTenantSetting('sams_custom_app_name_v2', 'Fox System');
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassRoom[]>([]);
   

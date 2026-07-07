@@ -154,7 +154,7 @@ export default function NotificationsCenter() {
       // 2. Send WhatsApp background promise with active custom credentials if enabled
       let waPromise = null;
       if (whatsappEnabled) {
-        const sysName = getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية');
+        const sysName = getTenantSetting('sams_custom_app_name_v2', 'Fox System');
         waPromise = fetch('/api/send-whatsapp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

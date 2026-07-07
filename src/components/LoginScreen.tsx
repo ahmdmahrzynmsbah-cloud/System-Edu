@@ -17,7 +17,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [error, setError] = useState('');
 
   // Retrieve current branding context - on login screen, we always default to FOX to keep it clean and reset
-  const sysName = 'سيستم FOX لادارة السناتر التعليمية';
+  const sysName = 'Fox System';
   const sysLogo = 'F';
 
   

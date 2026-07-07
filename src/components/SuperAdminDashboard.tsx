@@ -715,7 +715,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                 <span className="text-xs bg-amber-400/20 text-amber-300 font-black px-2.5 py-0.5 rounded-full border border-amber-400/15">
                   المدير العام
                 </span>
-                <h1 className="text-sm font-black text-white mt-1.5 tracking-wide">لوحة تحكم FOX المركزية</h1>
+                <h1 className="text-sm font-black text-white mt-1.5 tracking-wide">لوحة تحكم Fox System المركزية</h1>
               </div>
             </div>
           </div>
@@ -843,7 +843,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
             تسجيل خروج آمن للمالك
           </button>
           <div className="text-center mt-3 text-[9px] text-slate-500 font-bold font-mono">
-            FOX ADMIN SYSTEM v2.5.4
+            Fox System Admin v2.5.4
           </div>
         </div>
       </aside>
@@ -949,7 +949,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
 
                 <div className="bg-white p-5 rounded-2xl border border-gray-150 shadow-xs flex items-center justify-between hover:shadow-md transition-shadow">
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">إجمالي مبيعات رخص FOX</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">إجمالي مبيعات رخص Fox System</p>
                     <h3 className="text-2xl font-black text-amber-600 font-mono">{(totalRevenue).toLocaleString()} ج.م</h3>
                     <p className="text-[9px] text-amber-600 font-semibold">أرباح مبيعات التراخيص</p>
                   </div>
@@ -1169,7 +1169,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                               <td className="p-4">
                                 <div className="font-black text-[#0D5C8C] flex items-center gap-1">
                                   <Globe className="w-3.5 h-3.5 text-sky-500" />
-                                  <span>{tenant.appName || 'سيستم FOX'}</span>
+                                  <span>{tenant.appName || 'Fox System'}</span>
                                 </div>
                               </td>
                               <td className="p-4 text-slate-600 font-mono">{tenant.phone}</td>
@@ -1320,7 +1320,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                             الاسم الحركي: {tenant.id}
                           </span>
                           <h4 className="font-extrabold text-slate-900 text-sm mt-1">{tenant.name}</h4>
-                          <p className="text-[11px] text-[#0D5C8C] font-semibold">{tenant.appName || 'سيستم FOX'}</p>
+                          <p className="text-[11px] text-[#0D5C8C] font-semibold">{tenant.appName || 'Fox System'}</p>
                         </div>
 
                         <div className="flex flex-col items-end text-left">
@@ -1469,7 +1469,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                     <input
                       type="text"
                       required
-                      placeholder="مثال: الإدارة العامة لشركة FOX أو الدعم الفني"
+                      placeholder="مثال: الإدارة العامة لشركة Fox System أو الدعم الفني"
                       value={announcement.sender}
                       onChange={(e) => setAnnouncement({...announcement, sender: e.target.value})}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-[#0D5C8C] focus:bg-white font-medium"

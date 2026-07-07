@@ -199,7 +199,7 @@ let gradeFees = {
   ];
   const COLORS = ['#0D5C8C', '#E8192C'];
 
-  const appName = getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية');
+  const appName = getTenantSetting('sams_custom_app_name_v2', 'Fox System');
 
   return (
     <div className="space-y-6" id="sams_control_dashboard">

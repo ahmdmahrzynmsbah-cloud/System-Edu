@@ -80,8 +80,8 @@ export default function App() {
         
         // Get the current custom app name if defined, else use default
         const sysName = localStorage.getItem('sams_current_tenant_id') === 'super-admin' ? 
-          'سيستم إدارة FOX المركزية' : 
-          (localStorage.getItem(localStorage.getItem('sams_current_tenant_id') !== 'default' && localStorage.getItem('sams_current_tenant_id') ? `${localStorage.getItem('sams_current_tenant_id')}_sams_custom_app_name_v2` : 'sams_custom_app_name_v2') || 'سيستم FOX لادارة السناتر التعليمية');
+          'إدارة Fox System المركزية' : 
+          (localStorage.getItem(localStorage.getItem('sams_current_tenant_id') !== 'default' && localStorage.getItem('sams_current_tenant_id') ? `${localStorage.getItem('sams_current_tenant_id')}_sams_custom_app_name_v2` : 'sams_custom_app_name_v2') || 'Fox System');
 
         // Random fluid progress increment
         const nextProgress = prev + Math.floor(Math.random() * 12) + 4;
@@ -116,14 +116,14 @@ export default function App() {
   const [currentUserName, setCurrentUserName] = useState(() => {
     const stored = localStorage.getItem('sams_logged_in_name') || '';
     if (stored === 'د. أحمد كمال' || stored === 'أحمد كمال' || stored === 'د أحمد كمال' || stored === 'الدكتور في اللغة العربية') {
-      localStorage.setItem('sams_logged_in_name', 'إدارة سيستم FOX');
-      return 'إدارة سيستم FOX';
+      localStorage.setItem('sams_logged_in_name', 'إدارة Fox System');
+      return 'إدارة Fox System';
     }
     return stored;
   });
 
   // Customized Branding state
-  const [customAppName, setCustomAppName] = useState(() => getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية'));
+  const [customAppName, setCustomAppName] = useState(() => getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
   const [customAppLogo, setCustomAppLogo] = useState(() => getTenantSetting('sams_custom_app_logo_v2', 'F'));
   const [customHeaderTitle, setCustomHeaderTitle] = useState(() => getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة'));
   const [customHeaderSubtitle, setCustomHeaderSubtitle] = useState(() => getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -318,7 +318,7 @@ export default function App() {
   };
 
   const handleSettingsSaved = () => {
-    setCustomAppName(getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية'));
+    setCustomAppName(getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
     setCustomAppLogo(getTenantSetting('sams_custom_app_logo_v2', 'F'));
     setCustomHeaderTitle(getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة'));
     setCustomHeaderSubtitle(getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -337,7 +337,7 @@ export default function App() {
     setCurrentUserId(null);
 
     // Reset local custom names to defaults
-    setCustomAppName('سيستم FOX لادارة السناتر التعليمية');
+    setCustomAppName('Fox System');
     setCustomAppLogo('F');
     setCustomHeaderTitle('المنصة التعليمية المتكاملة');
     setCustomHeaderSubtitle('بوابة التحكم الإدارية والحصص الأكاديمية');
@@ -550,7 +550,7 @@ export default function App() {
             setActiveTab('dashboard');
           }
           // Dynamic brand update upon successful login
-          setCustomAppName(getTenantSetting('sams_custom_app_name_v2', 'سيستم FOX لادارة السناتر التعليمية'));
+          setCustomAppName(getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
           setCustomAppLogo(getTenantSetting('sams_custom_app_logo_v2', 'F'));
           setCustomHeaderTitle(getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة'));
           setCustomHeaderSubtitle(getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -591,7 +591,7 @@ export default function App() {
           <div className="w-14 h-14 bg-gradient-to-tr from-[#1A7FAA] to-[#F5C453] rounded-full flex items-center justify-center shadow-lg text-white mb-3 ring-4 ring-white/10">
             <GraduationCap className="w-8 h-8 text-white stroke-[1.5]" />
           </div>
-          <h1 className="text-xl font-extrabold text-white tracking-wide">سيستم FOX</h1>
+          <h1 className="text-xl font-extrabold text-white tracking-wide">Fox System</h1>
           <p className="text-xs font-semibold text-[#FCF6BA] mt-1.5 px-3 py-1 bg-white/10 rounded-full select-none">لادارة السناتر التعليمية</p>
         </div>
 
