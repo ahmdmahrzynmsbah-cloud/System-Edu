@@ -54,6 +54,7 @@ export default function AttendanceTracker() {
   });
   
   const [selectedClass, setSelectedClass] = useState('all');
+  const [selectedGrade, setSelectedGrade] = useState('all');
   
   // Custom alerts/modals
   const [successMsg, setSuccessMsg] = useState('');
@@ -136,9 +137,12 @@ export default function AttendanceTracker() {
 
   // Group Management logic
   const filteredStudents = useMemo(() => {
-    if (selectedClass === 'all') return students;
-    return students.filter(s => s.class_id === selectedClass);
-  }, [students, selectedClass]);
+    return students.filter(s => {
+      const matchesClass = selectedClass === 'all' || s.class_id === selectedClass;
+      const matchesGrade = selectedGrade === 'all' || s.grade_level === selectedGrade;
+      return matchesClass && matchesGrade;
+    });
+  }, [students, selectedClass, selectedGrade]);
 
   const markUnscannedAsAbsent = () => {
     setSuccessMsg('');
@@ -298,33 +302,46 @@ export default function AttendanceTracker() {
 
         {/* Left side: Group Attendance Management */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col h-[500px]">
-          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center mb-6">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 whitespace-nowrap">
               <UserCheck className="w-5 h-5 text-[#1A7FAA]" />
               مراجعة حضور المجموعات
             </h3>
             
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto pb-1">
+              <div className="flex items-center justify-between h-9 shrink-0 gap-1 bg-slate-50 px-2 rounded-lg border border-slate-200">
                 <Calendar className="w-4 h-4 text-slate-500 mx-1" />
-                <span className="text-xs font-bold text-slate-700 select-none">
+                <span className="text-[11px] font-bold text-slate-700 select-none">
                   {new Date(selectedDate).toLocaleDateString('ar-EG', { weekday: 'long' })}
                 </span>
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent border-none text-xs font-bold text-slate-700 focus:ring-0 cursor-pointer p-0 m-0"
+                  className="bg-transparent border-none text-[11px] font-bold text-slate-700 focus:ring-0 cursor-pointer p-0 m-0 w-24"
                 />
               </div>
 
               <select
+                value={selectedGrade}
+                onChange={(e) => { setSelectedGrade(e.target.value); setSelectedClass('all'); }}
+                className="h-9 shrink-0 bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-bold rounded-lg px-2 focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden cursor-pointer"
+              >
+                <option value="all">كل الصفوف</option>
+                <option value="الأول الإعدادي">الأول الإعدادي</option>
+                <option value="الثاني الإعدادي">الثاني الإعدادي</option>
+                <option value="الثالث الإعدادي">الثالث الإعدادي</option>
+                <option value="الأول الثانوي">الأول الثانوي</option>
+                <option value="الثاني الثانوي">الثاني الثانوي</option>                <option value="الثالث الثانوي">الثالث الثانوي</option>
+              </select>
+
+              <select
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2 focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden cursor-pointer"
+                className="h-9 shrink-0 bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-bold rounded-lg px-2 focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden cursor-pointer"
               >
-                <option value="all">جميع المجموعات</option>
-                {classes.map(c => (
+                <option value="all">كل المجموعات</option>
+                {classes.filter(c => selectedGrade === 'all' || c.grade_level === selectedGrade).map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
@@ -351,6 +368,7 @@ export default function AttendanceTracker() {
                 <tr>
                   <th className="px-4 py-3">الطالب</th>
                   <th className="px-4 py-3">رقم القيد</th>
+                  {selectedGrade === 'all' && <th className="px-4 py-3">الصف</th>}
                   {selectedClass === 'all' && <th className="px-4 py-3">المجموعة</th>}
                   <th className="px-4 py-3 text-center">حالة اليوم</th>
                   <th className="px-4 py-3 text-center">إجراءات</th>
@@ -361,11 +379,13 @@ export default function AttendanceTracker() {
                   const studentAtt = attendance.find(a => a.student_id === student.id && a.date === selectedDate);
                   const status = studentAtt ? studentAtt.status : 'pending';
                   const classObj = classes.find(c => c.id === student.class_id);
-
                   return (
                     <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-3 font-bold text-slate-800">{student.name}</td>
                       <td className="px-4 py-3 font-mono text-xs text-slate-500">{student.registration_id}</td>
+                      {selectedGrade === 'all' && (
+                        <td className="px-4 py-3 text-xs text-slate-600">{student.grade_level || '-'}</td>
+                      )}
                       {selectedClass === 'all' && (
                         <td className="px-4 py-3 text-xs text-slate-600">{classObj?.name || '-'}</td>
                       )}

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Student, Teacher, ClassRoom, Subject, Grade, Attendance, ClassSchedule, FeePayment, SystemNotification, AuditLog, CenterScheduleData, Exam, Assignment, ExamGrade, AssignmentGrade } from '../types';
+import { Student, Teacher, ClassRoom, Book, BookPayment, Subject, Grade, Attendance, ClassSchedule, FeePayment, SystemNotification, AuditLog, CenterScheduleData, Exam, Assignment, ExamGrade, AssignmentGrade } from '../types';
 import {
   INITIAL_STUDENTS,
   INITIAL_TEACHERS,

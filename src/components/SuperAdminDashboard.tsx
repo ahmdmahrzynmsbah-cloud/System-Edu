@@ -1230,15 +1230,26 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                                 </div>
                               </td>
                               <td className="p-4 max-w-xs">
-                                <div className="flex flex-wrap gap-1">
-                                  {tenant.features.map(f => {
-                                    const match = featuresList.find(fl => fl.id === f);
+                                <div className="flex flex-wrap gap-1.5">
+                                  {(() => {
+                                    const mainFeatures = tenant.features
+                                      .map(f => featuresList.find(fl => fl.id === f))
+                                      .filter(Boolean);
                                     return (
-                                      <span key={f} className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-sans">
-                                        {match ? match.label : f}
-                                      </span>
+                                      <>
+                                        {mainFeatures.slice(0, 2).map((match, idx) => (
+                                          <span key={idx} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-md font-bold font-sans whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]" title={match!.label}>
+                                            {match!.label}
+                                          </span>
+                                        ))}
+                                        {mainFeatures.length > 2 && (
+                                          <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-2 py-1 rounded-md font-black font-sans shrink-0">
+                                            +{mainFeatures.length - 2} ميزات
+                                          </span>
+                                        )}
+                                      </>
                                     );
-                                  })}
+                                  })()}
                                 </div>
                               </td>
                               <td className="p-4 text-center">

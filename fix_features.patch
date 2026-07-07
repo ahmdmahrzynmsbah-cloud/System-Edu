@@ -1,0 +1,39 @@
+--- src/components/SuperAdminDashboard.tsx
++++ src/components/SuperAdminDashboard.tsx
+@@ -1231,14 +1231,24 @@
+                                 </div>
+                               </td>
+                               <td className="p-4 max-w-xs">
+-                                <div className="flex flex-wrap gap-1">
+-                                  {tenant.features.map(f => {
+-                                    const match = featuresList.find(fl => fl.id === f);
+-                                    return (
+-                                      <span key={f} className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-sans">
+-                                        {match ? match.label : f}
+-                                      </span>
+-                                    );
+-                                  })}
++                                <div className="flex flex-wrap gap-1.5">
++                                  {(() => {
++                                    // Only show main features that exist in featuresList
++                                    const mainFeatures = tenant.features
++                                      .map(f => featuresList.find(fl => fl.id === f))
++                                      .filter(Boolean);
++                                    
++                                    return (
++                                      <>
++                                        {mainFeatures.slice(0, 2).map((match, idx) => (
++                                          <span key={idx} className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-1 rounded-md font-sans whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]" title={match!.label}>
++                                            {match!.label}
++                                          </span>
++                                        ))}
++                                        {mainFeatures.length > 2 && (
++                                          <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-1 rounded-md font-black font-sans shrink-0">
++                                            +{mainFeatures.length - 2} ميزات
++                                          </span>
++                                        )}
++                                      </>
++                                    );
++                                  })()}
+                                 </div>
+                               </td>

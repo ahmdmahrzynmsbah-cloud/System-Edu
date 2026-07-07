@@ -76,6 +76,11 @@ export default function ExamsAndAssignments() {
 
   // Search queries for lists
   const [examSearch, setExamSearch] = useState('');
+  const [examGradeFilter, setExamGradeFilter] = useState('all');
+  const [examClassFilter, setExamClassFilter] = useState('all');
+  const [assignmentGradeFilter, setAssignmentGradeFilter] = useState('all');
+  const [assignmentClassFilter, setAssignmentClassFilter] = useState('all');
+  const [gradingGradeFilter, setGradingGradeFilter] = useState('all');
   const [assignmentSearch, setAssignmentSearch] = useState('');
 
   // Deletion modals state
@@ -474,25 +479,31 @@ export default function ExamsAndAssignments() {
     return exams.filter(e => {
       const cls = classes.find(c => c.id === e.class_id);
       const clsName = cls ? cls.name : '';
-      return (
-        e.name.toLowerCase().includes(examSearch.toLowerCase()) ||
+      const matchesSearch = e.name.toLowerCase().includes(examSearch.toLowerCase()) ||
         e.type.toLowerCase().includes(examSearch.toLowerCase()) ||
-        clsName.toLowerCase().includes(examSearch.toLowerCase())
-      );
+        clsName.toLowerCase().includes(examSearch.toLowerCase());
+      
+      const matchesGrade = examGradeFilter === 'all' || (cls && cls.grade_level === examGradeFilter);
+      const matchesClass = examClassFilter === 'all' || e.class_id === examClassFilter;
+
+      return matchesSearch && matchesGrade && matchesClass;
     });
-  }, [exams, examSearch, classes]);
+  }, [exams, examSearch, classes, examGradeFilter, examClassFilter]);
 
   // Assignment list search filter
   const filteredAssignments = useMemo(() => {
     return assignments.filter(a => {
       const cls = classes.find(c => c.id === a.class_id);
       const clsName = cls ? cls.name : '';
-      return (
-        a.title.toLowerCase().includes(assignmentSearch.toLowerCase()) ||
-        clsName.toLowerCase().includes(assignmentSearch.toLowerCase())
-      );
+      const matchesSearch = a.title.toLowerCase().includes(assignmentSearch.toLowerCase()) ||
+        clsName.toLowerCase().includes(assignmentSearch.toLowerCase());
+
+      const matchesGrade = assignmentGradeFilter === 'all' || (cls && cls.grade_level === assignmentGradeFilter);
+      const matchesClass = assignmentClassFilter === 'all' || a.class_id === assignmentClassFilter;
+
+      return matchesSearch && matchesGrade && matchesClass;
     });
-  }, [assignments, assignmentSearch, classes]);
+  }, [assignments, assignmentSearch, classes, assignmentGradeFilter, assignmentClassFilter]);
 
   return (
     <div className="space-y-6" id="sams_exams_assignments_module">
@@ -583,7 +594,7 @@ export default function ExamsAndAssignments() {
         <div className="space-y-6">
           
           {/* Quick Filters Panel */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs grid grid-cols-1 md:grid-cols-5 gap-4">
             
             {/* Term Select */}
             <div className="space-y-1.5">
@@ -601,6 +612,34 @@ export default function ExamsAndAssignments() {
               </select>
             </div>
 
+            {/* Grade Filter Select */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">الصف الدراسي</label>
+              <select
+                value={gradingGradeFilter}
+                onChange={(e) => {
+                  const newGrade = e.target.value;
+                  setGradingGradeFilter(newGrade);
+                  const filteredClasses = classes.filter(c => newGrade === 'all' || c.grade_level === newGrade);
+                  if (filteredClasses.length > 0) {
+                    setSelectedClassId(filteredClasses[0].id);
+                  } else {
+                    setSelectedClassId('');
+                  }
+                  setSuccessMsg('');
+                }}
+                className="w-full text-xs font-semibold border border-slate-200 p-2.5 rounded-xl bg-white text-slate-700"
+              >
+                <option value="all">كل الصفوف</option>
+                <option value="الأول الإعدادي">الأول الإعدادي</option>
+                <option value="الثاني الإعدادي">الثاني الإعدادي</option>
+                <option value="الثالث الإعدادي">الثالث الإعدادي</option>
+                <option value="الأول الثانوي">الأول الثانوي</option>
+                <option value="الثاني الثانوي">الثاني الثانوي</option>
+                <option value="الثالث الثانوي">الثالث الثانوي</option>
+              </select>
+            </div>
+
             {/* Class Group Select */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-700">المجموعة الدراسية</label>
@@ -612,10 +651,10 @@ export default function ExamsAndAssignments() {
                 }}
                 className="w-full text-xs font-semibold border border-slate-200 p-2.5 rounded-xl bg-white text-slate-700"
               >
-                {classes.length === 0 ? (
+                {classes.filter(c => gradingGradeFilter === 'all' || c.grade_level === gradingGradeFilter).length === 0 ? (
                   <option value="">لا توجد مجموعات</option>
                 ) : (
-                  classes.map(c => (
+                  classes.filter(c => gradingGradeFilter === 'all' || c.grade_level === gradingGradeFilter).map(c => (
                     <option key={c.id} value={c.id}>{c.name} (الصف: {c.grade_level})</option>
                   ))
                 )}
@@ -1173,19 +1212,47 @@ export default function ExamsAndAssignments() {
           <div className="lg:col-span-7 space-y-4">
             
             {/* Search filter */}
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs flex items-center gap-3">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  placeholder="ابحث باسم الامتحان، تصنيفه، أو اسم المجموعة..."
-                  value={examSearch}
-                  onChange={(e) => setExamSearch(e.target.value)}
-                  className="w-full text-right pr-9 pl-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-hidden"
-                  dir="rtl"
-                />
-                <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs flex flex-col gap-3">
+              <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
+                <div className="relative flex-1 w-full">
+                  <input
+                    type="text"
+                    placeholder="ابحث باسم الامتحان، تصنيفه، أو اسم المجموعة..."
+                    value={examSearch}
+                    onChange={(e) => setExamSearch(e.target.value)}
+                    className="w-full text-right pr-9 pl-3 h-10 text-xs border border-slate-200 rounded-xl focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden"
+                    dir="rtl"
+                  />
+                  <Search className="absolute right-3 top-3 w-4 h-4 text-slate-400" />
+                </div>
+                <div className="flex items-center gap-2 w-full xl:w-auto overflow-x-auto pb-1">
+                  <select
+                    value={examGradeFilter}
+                    onChange={(e) => { setExamGradeFilter(e.target.value); setExamClassFilter('all'); }}
+                    className="h-10 shrink-0 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden cursor-pointer"
+                  >
+                    <option value="all">كل الصفوف</option>
+                    <option value="الأول الإعدادي">الأول الإعدادي</option>
+                    <option value="الثاني الإعدادي">الثاني الإعدادي</option>
+                    <option value="الثالث الإعدادي">الثالث الإعدادي</option>
+                    <option value="الأول الثانوي">الأول الثانوي</option>
+                    <option value="الثاني الثانوي">الثاني الثانوي</option>
+                    <option value="الثالث الثانوي">الثالث الثانوي</option>
+                  </select>
+
+                  <select
+                    value={examClassFilter}
+                    onChange={(e) => setExamClassFilter(e.target.value)}
+                    className="h-10 shrink-0 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden cursor-pointer"
+                  >
+                    <option value="all">كل المجموعات</option>
+                    {classes.filter(c => examGradeFilter === 'all' || c.grade_level === examGradeFilter).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap shrink-0">إجمالي: {filteredExams.length}</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">إجمالي الامتحانات: {exams.length}</span>
             </div>
 
             {/* List */}
@@ -1372,19 +1439,47 @@ export default function ExamsAndAssignments() {
           <div className="lg:col-span-7 space-y-4">
             
             {/* Search filter */}
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs flex items-center gap-3">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  placeholder="ابحث بموضوع الواجب، اسم المجموعة..."
-                  value={assignmentSearch}
-                  onChange={(e) => setAssignmentSearch(e.target.value)}
-                  className="w-full text-right pr-9 pl-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-hidden"
-                  dir="rtl"
-                />
-                <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs flex flex-col gap-3">
+              <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
+                <div className="relative flex-1 w-full">
+                  <input
+                    type="text"
+                    placeholder="ابحث بموضوع الواجب، اسم المجموعة..."
+                    value={assignmentSearch}
+                    onChange={(e) => setAssignmentSearch(e.target.value)}
+                    className="w-full text-right pr-9 pl-3 h-10 text-xs border border-slate-200 rounded-xl focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden"
+                    dir="rtl"
+                  />
+                  <Search className="absolute right-3 top-3 w-4 h-4 text-slate-400" />
+                </div>
+                <div className="flex items-center gap-2 w-full xl:w-auto overflow-x-auto pb-1">
+                  <select
+                    value={assignmentGradeFilter}
+                    onChange={(e) => { setAssignmentGradeFilter(e.target.value); setAssignmentClassFilter('all'); }}
+                    className="h-10 shrink-0 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden cursor-pointer"
+                  >
+                    <option value="all">كل الصفوف</option>
+                    <option value="الأول الإعدادي">الأول الإعدادي</option>
+                    <option value="الثاني الإعدادي">الثاني الإعدادي</option>
+                    <option value="الثالث الإعدادي">الثالث الإعدادي</option>
+                    <option value="الأول الثانوي">الأول الثانوي</option>
+                    <option value="الثاني الثانوي">الثاني الثانوي</option>
+                    <option value="الثالث الثانوي">الثالث الثانوي</option>
+                  </select>
+
+                  <select
+                    value={assignmentClassFilter}
+                    onChange={(e) => setAssignmentClassFilter(e.target.value)}
+                    className="h-10 shrink-0 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-3 focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden cursor-pointer"
+                  >
+                    <option value="all">كل المجموعات</option>
+                    {classes.filter(c => assignmentGradeFilter === 'all' || c.grade_level === assignmentGradeFilter).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap shrink-0">إجمالي: {filteredAssignments.length}</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">إجمالي الواجبات: {assignments.length}</span>
             </div>
 
             {/* List */}
