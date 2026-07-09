@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { samsDb } from '../utils/db';
+import { samsDb, getTenantSetting } from '../utils/db';
 import { Student, ClassRoom } from '../types';
 import { Search, Plus, Filter, Edit, Trash2, ShieldAlert, CheckCircle, Eye, X, BookOpen, CreditCard, Calendar, Phone, User, Users, ArrowUpDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -228,6 +228,12 @@ export default function StudentsList() {
     });
     setShowAddForm(true);
     setErrorMessage('');
+    
+    // Smoothly scroll back to top of window and module container
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      document.getElementById('sams_students_module')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const handleDeleteClick = (student: Student) => {

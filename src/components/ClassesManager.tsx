@@ -269,10 +269,6 @@ export default function ClassesManager() {
                                     </div>
                                     <div className="space-y-3">
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">الرقم القومي:</span>
-                                            <span className="font-mono text-slate-800">{selectedStudentDetails.national_id || 'غير مسجل'}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
                                             <span className="text-slate-500">حالة الحساب:</span>
                                             <span className={`font-bold ${
                                                 selectedStudentDetails.status === 'active' ? 'text-emerald-600' : 

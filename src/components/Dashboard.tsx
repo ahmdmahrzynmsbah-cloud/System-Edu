@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { samsDb, getTenantSetting } from '../utils/db';
-import { Users, UserCheck, BookOpen, CreditCard, Activity, AlertTriangle, TrendingUp, Calendar, ArrowUpRight, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Users, UserCheck, BookOpen, CreditCard, Activity, AlertTriangle, TrendingUp, Calendar, ArrowUpRight, ChevronLeft, ChevronRight, Plus, Megaphone, Pin, Eye, Gift, Trophy, Star, Volume2, X, Sparkles } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Exam, Assignment } from '../types';
 
@@ -29,6 +29,35 @@ export default function Dashboard({ onNavigateToTab }: DashboardProps) {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const [announcements, setAnnouncements] = useState<import('../types').Announcement[]>([]);
+  const [closedPopups, setClosedPopups] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadAnnouncements = () => {
+      setAnnouncements(samsDb.getAnnouncements() || []);
+    };
+    loadAnnouncements();
+    window.addEventListener('sams_announcements_changed', loadAnnouncements);
+    return () => window.removeEventListener('sams_announcements_changed', loadAnnouncements);
+  }, []);
+
+  useEffect(() => {
+    // Increment views for loaded active announcements
+    try {
+      const activeAnns = announcements.filter(a => a.status === 'active');
+      activeAnns.forEach(ann => {
+        const viewedKey = `sams_viewed_ann_${ann.id}`;
+        if (!sessionStorage.getItem(viewedKey)) {
+          sessionStorage.setItem(viewedKey, 'true');
+          samsDb.saveAnnouncement({
+            ...ann,
+            views_count: (ann.views_count || 0) + 1
+          });
+        }
+      });
+    } catch (e) {}
+  }, [announcements]);
 
   // Calendar states (default to July 2026)
   const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth());
@@ -208,8 +237,192 @@ let gradeFees = {
 
   const appName = getTenantSetting('sams_custom_app_name_v2', 'Fox System');
 
+  // Check if announcements are enabled for the current tenant
+  let isAnnouncementsEnabled = true;
+  try {
+    const tenantId = localStorage.getItem('sams_current_tenant_id');
+    if (tenantId && tenantId !== 'super-admin' && tenantId !== 'default') {
+      const savedTenants = localStorage.getItem('sams_system_tenants');
+      if (savedTenants) {
+        const tenants = JSON.parse(savedTenants);
+        const currentTenant = tenants.find((t: any) => t.id === tenantId);
+        if (currentTenant && currentTenant.announcementsEnabled === false) {
+          isAnnouncementsEnabled = false;
+        }
+      }
+    }
+  } catch (e) {}
+
+  const activeAnnouncements = isAnnouncementsEnabled
+    ? announcements
+        .filter(a => a.status === 'active')
+        .sort((a, b) => {
+          if (a.is_pinned && !b.is_pinned) return -1;
+          if (!a.is_pinned && b.is_pinned) return 1;
+          return new Date(b.publish_date || '').getTime() - new Date(a.publish_date || '').getTime();
+        })
+    : [];
+
+  const marqueeAnnouncements = activeAnnouncements.filter(a => a.display_style === 'marquee_banner');
+  const popupAnnouncements = activeAnnouncements.filter(a => a.display_style === 'popup_modal');
+
   return (
     <div className="space-y-6" id="sams_control_dashboard">
+      
+      {/* 📢 شريط الإعلانات العاجلة والتعليمات المتحرك (Ticker Banner) */}
+      {marqueeAnnouncements.length > 0 && (
+        <div className="bg-gradient-to-l from-rose-600 via-red-500 to-rose-600 text-white px-4 py-2.5 rounded-2xl border border-rose-450 shadow-md flex items-center gap-3 overflow-hidden font-sans shrink-0 relative">
+          <span className="flex items-center gap-1 bg-white/20 px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wide animate-pulse shrink-0 border border-white/10">
+            <Megaphone className="w-3.5 h-3.5" />
+            إعلان هام متحرك
+          </span>
+          
+          <div className="flex-1 min-w-0 overflow-hidden font-bold text-xs" dir="rtl">
+            <marquee 
+              scrollamount="5" 
+              direction="right" 
+              className="w-full cursor-pointer"
+              onMouseOver={(e: any) => e.currentTarget.stop()} 
+              onMouseOut={(e: any) => e.currentTarget.start()}
+            >
+              {marqueeAnnouncements.map((ann) => (
+                <span key={ann.id} className="inline-flex items-center gap-2 mx-12 text-slate-50 hover:text-white transition-colors">
+                  <span>✨</span>
+                  <span className="font-black underline decoration-white/30 underline-offset-4">{ann.title}:</span>
+                  <span className="font-bold">{ann.content}</span>
+                  {ann.action_text && (
+                    <button 
+                      onClick={() => {
+                        if (ann.action_link) {
+                          if (ann.action_link.startsWith('http')) {
+                            window.open(ann.action_link, '_blank');
+                          } else {
+                            onNavigateToTab(ann.action_link);
+                          }
+                        }
+                      }}
+                      className="mr-2 px-2.5 py-0.5 bg-white text-rose-600 rounded-md text-[10px] font-extrabold hover:bg-slate-100 transition-all shadow-xs cursor-pointer"
+                    >
+                      {ann.action_text}
+                    </button>
+                  )}
+                </span>
+              ))}
+            </marquee>
+          </div>
+        </div>
+      )}
+
+      {/* 📢 النافذة الإعلانية المنبثقة العامة (Popup Modal Ad) */}
+      {popupAnnouncements.filter(ann => !closedPopups.includes(ann.id)).slice(0, 1).map((ann) => {
+        const themeStyles = {
+          blue: { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-900', btn: 'bg-blue-600 hover:bg-blue-700 text-white', iconBg: 'bg-blue-100 text-blue-600' },
+          emerald: { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-900', btn: 'bg-emerald-600 hover:bg-emerald-700 text-white', iconBg: 'bg-emerald-100 text-emerald-600' },
+          amber: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-900', btn: 'bg-amber-600 hover:bg-amber-700 text-white', iconBg: 'bg-amber-100 text-amber-600' },
+          rose: { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-900', btn: 'bg-rose-600 hover:bg-rose-700 text-white', iconBg: 'bg-rose-100 text-rose-600' },
+          indigo: { bg: 'bg-indigo-50', border: 'border-indigo-100', text: 'text-indigo-900', btn: 'bg-indigo-600 hover:bg-indigo-700 text-white', iconBg: 'bg-indigo-100 text-indigo-600' },
+          purple: { bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-900', btn: 'bg-purple-600 hover:bg-purple-700 text-white', iconBg: 'bg-purple-100 text-[#0D5C8C]' }
+        }[ann.color_theme || 'blue'] || { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-900', btn: 'bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white', iconBg: 'bg-blue-100 text-blue-600' };
+
+        const IconComponent = {
+          megaphone: <Megaphone className="w-8 h-8" />,
+          gift: <Gift className="w-8 h-8" />,
+          alert: <AlertTriangle className="w-8 h-8 text-amber-600" />,
+          trophy: <Trophy className="w-8 h-8 text-yellow-600 animate-bounce" />,
+          star: <Star className="w-8 h-8 text-yellow-500 fill-yellow-500 animate-pulse" />
+        }[ann.icon_type || 'megaphone'] || <Megaphone className="w-8 h-8" />;
+
+        return (
+          <div key={ann.id} className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" dir="rtl">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col relative">
+              
+              {/* Glow Header Accent */}
+              <div className="h-2 bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 w-full animate-pulse" />
+
+              {/* Close Button */}
+              <button 
+                onClick={() => setClosedPopups(prev => [...prev, ann.id])} 
+                className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-full transition-colors cursor-pointer z-10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Image Banner */}
+              {ann.image_url ? (
+                <div className="w-full h-48 bg-slate-50 border-b border-slate-100 relative overflow-hidden shrink-0">
+                  <img 
+                    src={ann.image_url} 
+                    alt={ann.title} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  <div className="absolute bottom-4 right-4 text-white flex items-center gap-1.5 font-bold">
+                    <span className="p-1 bg-white/20 backdrop-blur-md rounded-lg">
+                      {IconComponent}
+                    </span>
+                    <span className="text-xs bg-red-600 text-white px-2.5 py-0.5 rounded-full font-black tracking-wider animate-pulse">إعلان متميز جداً</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 pb-0 flex justify-center shrink-0">
+                  <div className={`p-4 rounded-full ${themeStyles.iconBg} ring-8 ring-white shadow-md`}>
+                    {IconComponent}
+                  </div>
+                </div>
+              )}
+
+              {/* Content Body */}
+              <div className="p-6 space-y-4 flex-1 text-center overflow-y-auto no-scrollbar">
+                {!ann.image_url && (
+                  <span className="inline-block text-[10px] bg-red-50 text-red-600 px-3 py-1 rounded-full font-black animate-pulse border border-red-100">
+                    إشعار عاجل من الإدارة
+                  </span>
+                )}
+
+                <h3 className="font-black text-slate-800 text-lg leading-snug">
+                  {ann.title}
+                </h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed font-sans whitespace-pre-line text-right bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[160px] overflow-y-auto">
+                  {ann.content}
+                </p>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="p-6 pt-0 flex flex-col gap-2 shrink-0">
+                {ann.action_text && (
+                  <button
+                    onClick={() => {
+                      setClosedPopups(prev => [...prev, ann.id]);
+                      if (ann.action_link) {
+                        if (ann.action_link.startsWith('http')) {
+                          window.open(ann.action_link, '_blank');
+                        } else {
+                          onNavigateToTab(ann.action_link);
+                        }
+                      }
+                    }}
+                    className="w-full py-3 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white font-black text-xs rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {ann.action_text}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setClosedPopups(prev => [...prev, ann.id])}
+                  className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-xs rounded-2xl transition-colors cursor-pointer"
+                >
+                  حسناً، إغلاق الإشعار
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })}
+
       {/* Header Info */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -309,6 +522,143 @@ let gradeFees = {
           </div>
         </div>
 
+      </div>
+
+      {/* 📢 اللوحة الجدارية للإعلانات والتوجيهات الإدارية العامة */}
+      <div className="bg-white rounded-2xl border border-gray-150 shadow-sm p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-gray-105 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-sky-50 text-sky-600 rounded-lg">
+              <Megaphone className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">لوحة الإعلانات والتوجيهات المركزية (Fox System)</h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">التعليمات والإعلانات الرسمية الصادرة من الإدارة العامة ولجنة المتابعة</p>
+            </div>
+          </div>
+          <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded font-bold">بث مباشر وموثق</span>
+        </div>
+
+        {activeAnnouncements.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-xs font-sans">
+            <span className="text-2xl block mb-2">📢</span>
+            لا توجد إعلانات أو توجيهات إدارية جديدة حالياً
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {activeAnnouncements.map((ann) => {
+              // Custom themes for cards
+              const themeStyles = {
+                blue: { bg: 'bg-blue-50/40', border: 'border-blue-100', text: 'text-blue-900', badge: 'bg-blue-100 text-blue-800', lightText: 'text-blue-600/80', hover: 'hover:border-blue-300', btn: 'bg-blue-600 hover:bg-blue-700 text-white' },
+                emerald: { bg: 'bg-emerald-50/40', border: 'border-emerald-100', text: 'text-emerald-900', badge: 'bg-emerald-100 text-emerald-800', lightText: 'text-emerald-600/80', hover: 'hover:border-emerald-300', btn: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
+                amber: { bg: 'bg-amber-50/40', border: 'border-amber-100', text: 'text-amber-900', badge: 'bg-amber-100 text-amber-800', lightText: 'text-amber-600/80', hover: 'hover:border-amber-300', btn: 'bg-amber-600 hover:bg-amber-700 text-white' },
+                rose: { bg: 'bg-rose-50/40', border: 'border-rose-100', text: 'text-rose-900', badge: 'bg-rose-100 text-rose-800', lightText: 'text-rose-600/80', hover: 'hover:border-rose-300', btn: 'bg-rose-600 hover:bg-rose-700 text-white' },
+                indigo: { bg: 'bg-indigo-50/40', border: 'border-indigo-100', text: 'text-indigo-900', badge: 'bg-indigo-100 text-indigo-800', lightText: 'text-indigo-600/80', hover: 'hover:border-indigo-300', btn: 'bg-indigo-600 hover:bg-indigo-700 text-white' },
+                purple: { bg: 'bg-purple-50/40', border: 'border-purple-100', text: 'text-purple-900', badge: 'bg-purple-100 text-purple-800', lightText: 'text-purple-600/80', hover: 'hover:border-purple-300', btn: 'bg-purple-600 hover:bg-purple-700 text-white' }
+              }[ann.color_theme || 'blue'] || { bg: 'bg-blue-50/40', border: 'border-blue-100', text: 'text-blue-900', badge: 'bg-blue-100 text-blue-800', lightText: 'text-blue-600/80', hover: 'hover:border-blue-300', btn: 'bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white' };
+
+              const formattedDate = new Date(ann.publish_date).toLocaleDateString('ar-EG', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              });
+
+              // Icon mapping
+              const IconComponent = {
+                megaphone: <Megaphone className="w-3.5 h-3.5" />,
+                gift: <Gift className="w-3.5 h-3.5" />,
+                alert: <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />,
+                trophy: <Trophy className="w-3.5 h-3.5 text-yellow-500" />,
+                star: <Star className="w-3.5 h-3.5 text-sky-500 fill-current" />
+              }[ann.icon_type || 'megaphone'] || <Megaphone className="w-3.5 h-3.5" />;
+
+              const displayStyleBadge = {
+                card: null,
+                marquee_banner: <span className="text-[9px] bg-rose-50 text-rose-700 border border-rose-100 px-1.5 py-0.5 rounded font-bold">شريط متحرك</span>,
+                popup_modal: <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-100 px-1.5 py-0.5 rounded font-bold">منبثق</span>
+              }[ann.display_style || 'card'];
+
+              return (
+                <div 
+                  key={ann.id}
+                  className={`p-4 rounded-xl border ${themeStyles.bg} ${themeStyles.border} ${themeStyles.hover} transition-all duration-300 flex flex-col justify-between hover:shadow-xs`}
+                >
+                  <div className="space-y-3">
+                    {/* Header line */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        {ann.is_pinned && (
+                          <span className="shrink-0 bg-red-100 text-red-600 p-1 rounded-full animate-pulse" title="مثبت">
+                            <Pin className="w-3 h-3 fill-red-600 rotate-45" />
+                          </span>
+                        )}
+                        <span className="p-1 bg-white rounded border border-slate-200 shadow-3xs text-slate-700">
+                          {IconComponent}
+                        </span>
+                        <h3 className={`font-extrabold text-xs leading-snug ${themeStyles.text}`}>
+                          {ann.title}
+                        </h3>
+                      </div>
+                      
+                      <div className="flex items-center gap-1 shrink-0">
+                        {displayStyleBadge}
+                        <span className={`text-[9px] px-2 py-0.5 rounded font-bold ${themeStyles.badge}`}>
+                          {ann.target_audience === 'all' ? 'للجميع' : ann.target_audience === 'teachers' ? 'المعلمين فقط' : ann.target_audience === 'students' ? 'الطلاب' : 'أولياء الأمور'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Image Banner */}
+                    {ann.image_url && (
+                      <div className="w-full h-24 rounded-lg overflow-hidden border border-slate-100/60 bg-slate-50">
+                        <img 
+                          src={ann.image_url} 
+                          alt={ann.title} 
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium whitespace-pre-line text-right">
+                      {ann.content}
+                    </p>
+
+                    {/* CTA Button */}
+                    {ann.action_text && (
+                      <button
+                        onClick={() => {
+                          if (ann.action_link) {
+                            if (ann.action_link.startsWith('http')) {
+                              window.open(ann.action_link, '_blank');
+                            } else {
+                              onNavigateToTab(ann.action_link);
+                            }
+                          }
+                        }}
+                        className="w-full py-2 mt-1 bg-white border border-slate-200 hover:border-[#0D5C8C] hover:bg-slate-50 text-slate-700 hover:text-[#0D5C8C] transition-all rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-3xs cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3 text-[#0D5C8C]" />
+                        <span>{ann.action_text}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-200/40 mt-3.5 pt-2 text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1 font-mono">
+                      <Calendar className="w-3 h-3 opacity-60" />
+                      {formattedDate}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Eye className="w-3 h-3 opacity-60" />
+                      شوهد {ann.views_count || 0} مرة
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Main Charts & Analytics Section */}

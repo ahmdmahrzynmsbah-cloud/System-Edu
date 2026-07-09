@@ -72,6 +72,9 @@ try {
 
 // TENANT KEY ISOLATION HELPERS
 export function getTenantKey(key: string): string {
+  if (key === 'sams_v2_announcements' || key === 'global_sams_v2_announcements') {
+    return 'global_sams_v2_announcements';
+  }
   if (
     key === 'sams_system_tenants' || 
     key === 'sams_current_tenant_id' || 
@@ -170,9 +173,16 @@ export function saveToStorage<T>(key: string, data: T) {
   const serialized = JSON.stringify(data);
   localStorage.setItem(tenantKey, serialized);
   
-  // Realtime sync to Firebase for this tenant
   const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
-  if (tenantId !== 'super-admin') {
+  
+  if (key === 'sams_v2_announcements') {
+    setDoc(doc(db, 'system_tenant_data', 'global_sams_v2_announcements'), {
+      tenantId: 'global',
+      key: 'sams_v2_announcements',
+      data: serialized,
+      updatedAt: Date.now()
+    }).catch(err => console.error('Firebase announcements global sync error:', err));
+  } else if (tenantId !== 'super-admin') {
     setDoc(doc(db, 'system_tenant_data', tenantKey), {
       tenantId: tenantId,
       key: key,
@@ -319,16 +329,9 @@ export const samsDb = {
   },
 
   addTeacher(teacher: Omit<Teacher, 'id' | 'joined_date'>): { success: boolean; error?: string; teacher?: Teacher } {
-    if (teacher.national_id.length !== 14) {
-      return { success: false, error: 'الرقم القومي للمعلم يجب أن يكون 14 رقماً.' };
-    }
-    const teachers = this.getTeachers();
-    if (teachers.some(t => t.national_id === teacher.national_id)) {
-      return { success: false, error: 'المعلم مسجل مسبقاً بنفس الرقم القومي.' };
-    }
-
     const newTeacher: Teacher = {
       ...teacher,
+      national_id: teacher.national_id || '',
       id: `t-${Date.now()}`,
       joined_date: getCurrentTimestamp().split(' ')[0]
     };

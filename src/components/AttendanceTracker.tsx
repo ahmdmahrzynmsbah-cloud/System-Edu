@@ -121,7 +121,7 @@ export default function AttendanceTracker() {
     if (!cleanCode) return;
 
     // Find student by registration_id or barcode
-    const student = students.find(s => s.registration_id === cleanCode || s.national_id === cleanCode || s.barcode === cleanCode);
+    const student = students.find(s => s.registration_id === cleanCode || s.barcode === cleanCode);
     
     if (!student) {
       playErrorBuzzer();

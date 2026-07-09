@@ -175,18 +175,19 @@ export default function App() {
 
   // Global Realtime Sync
   useEffect(() => {
-    if (!currentUserRole || currentUserRole === 'super_admin') return;
+    if (!currentUserRole) return;
 
-    const tenantId = localStorage.getItem('sams_current_tenant_id');
-    if (!tenantId || tenantId === 'default') return;
+    const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
+    const activeTenantIds = currentUserRole === 'super_admin' ? ['global'] : [tenantId, 'global'];
 
     const q = query(
       collection(db, 'system_tenant_data'),
-      where('tenantId', '==', tenantId)
+      where('tenantId', 'in', activeTenantIds)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
        let changed = false;
+       let announcementsChanged = false;
        snapshot.docs.forEach(docSnap => {
           const remoteData = docSnap.data().data;
           const docKey = docSnap.id;
@@ -194,10 +195,16 @@ export default function App() {
           if (remoteData && remoteData !== localData) {
               localStorage.setItem(docKey, remoteData);
               changed = true;
+              if (docKey === 'global_sams_v2_announcements') {
+                announcementsChanged = true;
+              }
           }
        });
        if (changed) {
           window.dispatchEvent(new Event('sams_data_changed'));
+       }
+       if (announcementsChanged) {
+          window.dispatchEvent(new Event('sams_announcements_changed'));
        }
     });
 
@@ -399,15 +406,13 @@ export default function App() {
       (s.phone && s.phone.toLowerCase().includes(cleanQuery)) ||
       (s.parent_name && s.parent_name.toLowerCase().includes(cleanQuery)) ||
       (s.parent_phone && s.parent_phone.toLowerCase().includes(cleanQuery)) ||
-      (s.national_id && s.national_id.includes(cleanQuery)) ||
       (s.barcode && s.barcode.toLowerCase().includes(cleanQuery))
     ).slice(0, 5);
 
     const teachersRes = samsDb.getTeachers().filter(t => 
       (t.name && t.name.toLowerCase().includes(cleanQuery)) ||
       (t.specialization && t.specialization.toLowerCase().includes(cleanQuery)) ||
-      (t.phone && t.phone.toLowerCase().includes(cleanQuery)) ||
-      (t.national_id && t.national_id.includes(cleanQuery))
+      (t.phone && t.phone.toLowerCase().includes(cleanQuery))
     ).slice(0, 3);
 
     return { students: studentsRes, teachers: teachersRes };
@@ -493,7 +498,6 @@ export default function App() {
         { id: 'salaries', label: 'المرتبات والمصروفات', roles: ['teacher'] },
         { id: 'fees', label: 'اشتراكات الشهر والحسابات', roles: ['teacher', 'secretary'] },
         { id: 'notifications', label: 'بث الرسائل وتواصل الآباء', roles: ['teacher', 'secretary'] },
-        { id: 'announcements', label: 'الإعلانات واللوحات الجدارية', roles: ['teacher', 'secretary'] },
       ]
     },
     {
@@ -528,7 +532,7 @@ export default function App() {
     
     const user = users.find(u => u.id === currentUserId);
     if (user && user.permissions && user.permissions.length > 0) {
-      const perms = [...user.permissions, 'books', 'announcements'];
+      const perms = [...user.permissions, 'books'];
       baseItems = fullNavItems.filter(item => perms.includes(item.id));
     } else {
       baseItems = fullNavItems.filter(item => item.roles.includes(currentUserRole || 'teacher'));
@@ -954,7 +958,7 @@ export default function App() {
                       <div className="p-6 text-center text-slate-400 text-xs space-y-2 font-sans flex flex-col items-center justify-center">
                         <SearchX className="w-8 h-8 opacity-40" />
                         <p>لم نعثر على أي نتائج مطابقة</p>
-                        <p className="text-[10px] text-slate-400">تأكد من كتابة الاسم أو الرقم القومي بشكل صحيح وطبق المحاولة</p>
+                        <p className="text-[10px] text-slate-400">تأكد من كتابة الاسم أو رقم القيد بشكل صحيح وطبق المحاولة</p>
                       </div>
                     )}
 

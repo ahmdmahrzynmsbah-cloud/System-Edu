@@ -5,7 +5,7 @@
 
 export interface Student {
   id: string; // unique identification string
-  national_id: string; // الرقم القومي (14 digits)
+  national_id?: string;
   name: string; // الاسم
   registration_id: string; // رقم القيد
   class_id: string; // المجموعة
@@ -25,7 +25,7 @@ export interface Student {
 export interface Teacher {
   id: string;
   name: string;
-  national_id: string;
+  national_id?: string;
   specialization: string; // التخصص الدراسي
   phone: string;
   email: string;
@@ -226,5 +226,10 @@ export interface Announcement {
   status: 'active' | 'archived';
   color_theme?: 'blue' | 'emerald' | 'amber' | 'rose' | 'indigo' | 'purple';
   views_count?: number;
+  display_style?: 'card' | 'marquee_banner' | 'popup_modal';
+  action_text?: string;
+  action_link?: string;
+  icon_type?: 'megaphone' | 'gift' | 'alert' | 'trophy' | 'star';
+  image_url?: string;
 }
 

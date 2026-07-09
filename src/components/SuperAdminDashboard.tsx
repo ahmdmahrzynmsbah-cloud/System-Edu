@@ -1,6 +1,8 @@
 import { db } from "../lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { getAllTenants, saveTenant, deleteTenant, subscribeToTenants } from "../lib/tenantsApi";
+import { samsDb } from "../utils/db";
+import AnnouncementsManager from "./AnnouncementsManager";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -15,7 +17,7 @@ import {
   UserCheck, AlertCircle, RefreshCw, Layers, LayoutDashboard,
   Database, ShieldAlert, Terminal, CheckCircle2, ChevronRight,
   Smartphone, Award, HardDrive, Filter, Globe, Sparkles, Send, Shield,
-  Clock
+  Clock, Megaphone, Volume2, X, Trophy, AlertTriangle, Gift
 } from 'lucide-react';
 
 interface Tenant {
@@ -32,6 +34,7 @@ interface Tenant {
   maxStudents?: number;
   maxSecretaries?: number;
   whatsappGatewayEnabled?: boolean;
+  announcementsEnabled?: boolean;
 }
 
 interface SuperAdminLog {
@@ -48,7 +51,7 @@ interface SuperAdminDashboardProps {
 
 export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   // Navigation active tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'teachers' | 'databases' | 'movements' | 'broadcast' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'teachers' | 'databases' | 'movements' | 'broadcast' | 'settings' | 'announcements'>('overview');
   
   // Real-time system clock
   const [systemTime, setSystemTime] = useState(new Date());
@@ -58,6 +61,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       setSystemTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [closedPopups, setClosedPopups] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadAnnouncements = () => {
+      setAnnouncements(samsDb.getAnnouncements() || []);
+    };
+    loadAnnouncements();
+    window.addEventListener('sams_announcements_changed', loadAnnouncements);
+    return () => window.removeEventListener('sams_announcements_changed', loadAnnouncements);
   }, []);
   
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -98,7 +113,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
     features: ['dashboard', 'students', 'books', 'classes', 'attendance', 'exams', 'fees', 'notifications', 'settings'],
     maxStudents: 100,
     maxSecretaries: 3,
-    whatsappGatewayEnabled: true
+    whatsappGatewayEnabled: true,
+    announcementsEnabled: true
   });
 
   // Features description array with sub-features for customization
@@ -418,7 +434,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       pricePaid: Number(formData.pricePaid) || 0,
       maxStudents: Number(formData.maxStudents) || 100,
       maxSecretaries: Number(formData.maxSecretaries) || 3,
-      whatsappGatewayEnabled: formData.whatsappGatewayEnabled
+      whatsappGatewayEnabled: formData.whatsappGatewayEnabled,
+      announcementsEnabled: formData.announcementsEnabled
     };
 
     saveTenant(newTenant).then(() => {
@@ -461,7 +478,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       features: tenant.features || [],
       maxStudents: tenant.maxStudents || 100,
       maxSecretaries: tenant.maxSecretaries || 3,
-      whatsappGatewayEnabled: tenant.whatsappGatewayEnabled !== false
+      whatsappGatewayEnabled: tenant.whatsappGatewayEnabled !== false,
+      announcementsEnabled: tenant.announcementsEnabled !== false
     });
     setShowEditModal(true);
   };
@@ -489,7 +507,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
           pricePaid: Number(formData.pricePaid) || 0,
           maxStudents: Number(formData.maxStudents) || 100,
           maxSecretaries: Number(formData.maxSecretaries) || 3,
-          whatsappGatewayEnabled: formData.whatsappGatewayEnabled
+          whatsappGatewayEnabled: formData.whatsappGatewayEnabled,
+          announcementsEnabled: formData.announcementsEnabled
         };
       }
       return t;
@@ -634,26 +653,16 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       return;
     }
 
-    // Save global notification that teachers and secretaries will see
-    const notificationItem = {
-      id: `announcement-${Date.now()}`,
-      title: announcement.title.trim(),
-      message: announcement.message.trim(),
-      date: new Date().toISOString().split('T')[0],
-      sender: announcement.sender,
-      target: announcement.target,
-      isRead: false
-    };
-
-    // Store in global key
-    let currentAnnouncements: any[] = [];
-    try {
-      const saved = localStorage.getItem('sams_admin_notifications');
-      if (saved) currentAnnouncements = JSON.parse(saved);
-    } catch (e) {}
-
-    const updated = [notificationItem, ...currentAnnouncements];
-    localStorage.setItem('sams_admin_notifications', JSON.stringify(updated));
+    // Save global notification that teachers and secretaries will see using samsDb
+    const newNoti = samsDb.addAdminNotification({
+      type: 'system',
+      message: `📢 إشعار إداري من ${announcement.sender || 'الإدارة العامة'}: ${announcement.title.trim()} - ${announcement.message.trim()}`,
+      metadata: {
+        sender: announcement.sender,
+        target: announcement.target,
+        recipient_type: announcement.target === 'active' ? 'teachers' : 'all'
+      }
+    });
 
     setAnnouncement({
       title: '',
@@ -662,7 +671,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       target: 'all'
     });
 
-    addLog('بث إعلان عام', `تم بث رسالة إدارية لكافة المشتركين بعنوان: (${notificationItem.title})`, 'info');
+    addLog('بث إعلان عام', `تم بث رسالة إدارية لكافة المشتركين بعنوان: (${announcement.title.trim()})`, 'info');
     showToast('success', 'تم بث الإعلان بنجاح! سيظهر لجميع السكرتارية والمعلمين فور دخولهم لوحة التحكم الخاصة بهم.');
   };
 
@@ -731,6 +740,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
   
   // Calculate total student load across all databases
   const totalStudentsCrossTenant = Object.values(databaseStats).reduce((sum, s: any) => sum + (s?.studentsCount || 0), 0);
+
+  // Active announcements for general live preview & validation
+  const activeAnnouncements = announcements
+    .filter(a => a.status === 'active')
+    .sort((a, b) => {
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      return new Date(b.publish_date || '').getTime() - new Date(a.publish_date || '').getTime();
+    });
+
+  const marqueeAnnouncements = activeAnnouncements.filter(a => a.display_style === 'marquee_banner');
+  const popupAnnouncements = activeAnnouncements.filter(a => a.display_style === 'popup_modal');
 
   return (
     <div className="flex h-screen bg-[#F4F6F8] font-sans text-slate-800" dir="rtl">
@@ -852,6 +873,21 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
             </button>
 
             <button
+              onClick={() => setActiveTab('announcements')}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'announcements'
+                  ? 'bg-gradient-to-r from-sky-500/20 to-transparent text-sky-400 border-r-4 border-sky-500 font-black shadow-inner'
+                  : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Megaphone className="w-4.5 h-4.5" />
+                <span>إدارة الإعلانات واللوحات الجدارية</span>
+              </div>
+              <ChevronRight className={`w-3.5 h-3.5 opacity-60 transition-transform ${activeTab === 'announcements' ? 'rotate-90 text-sky-400' : ''}`} />
+            </button>
+
+            <button
               onClick={() => setActiveTab('settings')}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'settings'
@@ -937,6 +973,160 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* 📢 شريط الإعلانات العاجلة والتعليمات المتحرك للسيستم (Ticker Banner) */}
+          {marqueeAnnouncements.length > 0 && (
+            <div className="bg-gradient-to-l from-rose-600 via-red-500 to-rose-600 text-white px-4 py-2.5 rounded-2xl border border-rose-450 shadow-md flex items-center gap-3 overflow-hidden font-sans shrink-0 relative">
+              <span className="flex items-center gap-1 bg-white/20 px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wide animate-pulse shrink-0 border border-white/10">
+                <Megaphone className="w-3.5 h-3.5" />
+                إعلان هام متحرك (معاينة)
+              </span>
+              
+              <div className="flex-1 min-w-0 overflow-hidden font-bold text-xs" dir="rtl">
+                <marquee 
+                  scrollamount="5" 
+                  direction="right" 
+                  className="w-full cursor-pointer"
+                  onMouseOver={(e: any) => e.currentTarget.stop()} 
+                  onMouseOut={(e: any) => e.currentTarget.start()}
+                >
+                  {marqueeAnnouncements.map((ann) => (
+                    <span key={ann.id} className="inline-flex items-center gap-2 mx-12 text-slate-50 hover:text-white transition-colors">
+                      <span>✨</span>
+                      <span className="font-black underline decoration-white/30 underline-offset-4">{ann.title}:</span>
+                      <span className="font-bold">{ann.content}</span>
+                      {ann.action_text && (
+                        <button 
+                          onClick={() => {
+                            if (ann.action_link) {
+                              if (ann.action_link.startsWith('http')) {
+                                window.open(ann.action_link, '_blank');
+                              } else {
+                                setActiveTab(ann.action_link as any);
+                              }
+                            }
+                          }}
+                          className="mr-2 px-2.5 py-0.5 bg-white text-rose-600 rounded-md text-[10px] font-extrabold hover:bg-slate-100 transition-all shadow-xs cursor-pointer"
+                        >
+                          {ann.action_text}
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </marquee>
+              </div>
+            </div>
+          )}
+
+          {/* 📢 النافذة الإعلانية المنبثقة العامة للسيستم (Popup Modal Ad) */}
+          {popupAnnouncements.filter(ann => !closedPopups.includes(ann.id)).slice(0, 1).map((ann) => {
+            const themeStyles = {
+              blue: { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-900', btn: 'bg-blue-600 hover:bg-blue-700 text-white', iconBg: 'bg-blue-100 text-blue-600' },
+              emerald: { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-900', btn: 'bg-emerald-600 hover:bg-emerald-700 text-white', iconBg: 'bg-emerald-100 text-emerald-600' },
+              amber: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-900', btn: 'bg-amber-600 hover:bg-amber-700 text-white', iconBg: 'bg-amber-100 text-amber-600' },
+              rose: { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-900', btn: 'bg-rose-600 hover:bg-rose-700 text-white', iconBg: 'bg-rose-100 text-rose-600' },
+              indigo: { bg: 'bg-indigo-50', border: 'border-indigo-100', text: 'text-indigo-900', btn: 'bg-indigo-600 hover:bg-indigo-700 text-white', iconBg: 'bg-indigo-100 text-indigo-600' },
+              purple: { bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-900', btn: 'bg-purple-600 hover:bg-purple-700 text-white', iconBg: 'bg-purple-100 text-[#0D5C8C]' }
+            }[ann.color_theme || 'blue'] || { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-900', btn: 'bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white', iconBg: 'bg-blue-100 text-blue-600' };
+
+            const IconComponent = {
+              megaphone: <Megaphone className="w-8 h-8" />,
+              gift: <Gift className="w-8 h-8" />,
+              alert: <AlertTriangle className="w-8 h-8 text-amber-600" />,
+              trophy: <Trophy className="w-8 h-8 text-yellow-600 animate-bounce" />,
+              star: <Star className="w-8 h-8 text-yellow-500 fill-yellow-500 animate-pulse" />
+            }[ann.icon_type || 'megaphone'] || <Megaphone className="w-8 h-8" />;
+
+            return (
+              <div key={ann.id} className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" dir="rtl">
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col relative text-right">
+                  
+                  {/* Glow Header Accent */}
+                  <div className="h-2 bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 w-full animate-pulse" />
+
+                  {/* Close Button */}
+                  <button 
+                    onClick={() => setClosedPopups(prev => [...prev, ann.id])} 
+                    className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-full transition-colors cursor-pointer z-10"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  {/* Image Banner */}
+                  {ann.image_url ? (
+                    <div className="w-full h-48 bg-slate-50 border-b border-slate-100 relative overflow-hidden shrink-0">
+                      <img 
+                        src={ann.image_url} 
+                        alt={ann.title} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                      <div className="absolute bottom-4 right-4 text-white flex items-center gap-1.5 font-bold">
+                        <span className="p-1 bg-white/20 backdrop-blur-md rounded-lg">
+                          {IconComponent}
+                        </span>
+                        <span className="text-xs bg-red-600 text-white px-2.5 py-0.5 rounded-full font-black tracking-wider animate-pulse font-sans">معاينة الإعلان</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 pb-0 flex justify-center shrink-0">
+                      <div className={`p-4 rounded-full ${themeStyles.iconBg} ring-8 ring-white shadow-md`}>
+                        {IconComponent}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Content Body */}
+                  <div className="p-6 space-y-4 flex-1 text-center overflow-y-auto no-scrollbar">
+                    {!ann.image_url && (
+                      <span className="inline-block text-[10px] bg-red-50 text-red-600 px-3 py-1 rounded-full font-black animate-pulse border border-red-100 font-sans">
+                        إشعار عاجل (معاينة)
+                      </span>
+                    )}
+
+                    <h3 className="font-black text-slate-800 text-lg leading-snug">
+                      {ann.title}
+                    </h3>
+
+                    <p className="text-xs text-slate-600 leading-relaxed font-sans whitespace-pre-line text-right bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[160px] overflow-y-auto">
+                      {ann.content}
+                    </p>
+                  </div>
+
+                  {/* Footer Actions */}
+                  <div className="p-6 pt-0 flex flex-col gap-2 shrink-0">
+                    {ann.action_text && (
+                      <button
+                        onClick={() => {
+                          setClosedPopups(prev => [...prev, ann.id]);
+                          if (ann.action_link) {
+                            if (ann.action_link.startsWith('http')) {
+                              window.open(ann.action_link, '_blank');
+                            } else {
+                              setActiveTab(ann.action_link as any);
+                            }
+                          }
+                        }}
+                        className="w-full py-3 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white font-black text-xs rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer font-sans"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        {ann.action_text}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => setClosedPopups(prev => [...prev, ann.id])}
+                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-xs rounded-2xl transition-colors cursor-pointer font-sans"
+                    >
+                      حسناً، إغلاق الإشعار
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })}
 
           {/* TAB CONTENT RENDERING */}
 
@@ -1572,6 +1762,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
             </motion.div>
           )}
 
+          {activeTab === 'announcements' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="bg-white rounded-3xl border border-gray-150 shadow-sm p-6">
+                <AnnouncementsManager />
+              </div>
+            </motion.div>
+          )}
+
           {/* F. SECURITY SETTINGS & PASSWORD MODULE */}
           {activeTab === 'settings' && (
             <motion.div 
@@ -1753,6 +1955,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                         <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${formData.whatsappGatewayEnabled ? 'left-1' : 'left-6'}`} />
                       </button>
                       <span className={`text-[10px] font-bold ${formData.whatsappGatewayEnabled ? 'text-emerald-600' : 'text-slate-500'}`}>{formData.whatsappGatewayEnabled ? 'مفعلة' : 'معطلة'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-700">عرض الإعلانات وتنبيهات السيستم:</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, announcementsEnabled: !formData.announcementsEnabled})}
+                        className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer focus:outline-hidden ${formData.announcementsEnabled ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                      >
+                        <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${formData.announcementsEnabled ? 'left-1' : 'left-6'}`} />
+                      </button>
+                      <span className={`text-[10px] font-bold ${formData.announcementsEnabled ? 'text-indigo-600' : 'text-slate-500'}`}>{formData.announcementsEnabled ? 'مفعلة' : 'معطلة'}</span>
                     </div>
                   </div>
 
@@ -1967,6 +2181,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                         <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${formData.whatsappGatewayEnabled ? 'left-1' : 'left-6'}`} />
                       </button>
                       <span className={`text-[10px] font-bold ${formData.whatsappGatewayEnabled ? 'text-emerald-600' : 'text-slate-500'}`}>{formData.whatsappGatewayEnabled ? 'مفعلة' : 'معطلة'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-700">عرض الإعلانات وتنبيهات السيستم:</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, announcementsEnabled: !formData.announcementsEnabled})}
+                        className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer focus:outline-hidden ${formData.announcementsEnabled ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                      >
+                        <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${formData.announcementsEnabled ? 'left-1' : 'left-6'}`} />
+                      </button>
+                      <span className={`text-[10px] font-bold ${formData.announcementsEnabled ? 'text-indigo-600' : 'text-slate-500'}`}>{formData.announcementsEnabled ? 'مفعلة' : 'معطلة'}</span>
                     </div>
                   </div>
 

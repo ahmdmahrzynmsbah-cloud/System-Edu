@@ -67,10 +67,10 @@ export default function NotificationsCenter() {
   // WhatsApp manual API Settings states
   const [showWpSettings, setShowWpSettings] = useState(false);
   const isWpAllowed = isWhatsappGatewayEnabledForTenant();
-  const whatsappEnabled = isWpAllowed && localStorage.getItem('sams_whatsapp_enabled') !== 'false';
-  const [callmebotKeyValue, setCallmebotKeyValue] = useState(localStorage.getItem('sams_callmebot_api_key') || '');
-  const [ultramsgIdValue, setUltramsgIdValue] = useState(localStorage.getItem('sams_ultramsg_instance_id') || '');
-  const [ultramsgTokenValue, setUltramsgTokenValue] = useState(localStorage.getItem('sams_ultramsg_token') || '');
+  const whatsappEnabled = isWpAllowed && getTenantSetting('sams_whatsapp_enabled', 'true') !== 'false';
+  const [callmebotKeyValue, setCallmebotKeyValue] = useState(() => getTenantSetting('sams_callmebot_api_key', ''));
+  const [ultramsgIdValue, setUltramsgIdValue] = useState(() => getTenantSetting('sams_ultramsg_instance_id', ''));
+  const [ultramsgTokenValue, setUltramsgTokenValue] = useState(() => getTenantSetting('sams_ultramsg_token', ''));
   const [settingsSavedMsg, setSettingsSavedMsg] = useState(false);
 
   const saveWpSettings = () => {
@@ -127,10 +127,10 @@ export default function NotificationsCenter() {
   };
 
   const triggerLiveSmsTransmission = async (studentName: string, parentName: string, phone: string, message: string) => {
-    // Retrieve keys from LocalStorage dynamically
-    const cKey = localStorage.getItem('sams_callmebot_api_key') || '';
-    const uId = localStorage.getItem('sams_ultramsg_instance_id') || '';
-    const uToken = localStorage.getItem('sams_ultramsg_token') || '';
+    // Retrieve keys dynamically
+    const cKey = getTenantSetting('sams_callmebot_api_key', '');
+    const uId = getTenantSetting('sams_ultramsg_instance_id', '');
+    const uToken = getTenantSetting('sams_ultramsg_token', '');
 
 
     setTransmissionState({

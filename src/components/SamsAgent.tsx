@@ -80,7 +80,7 @@ export default function SamsAgent({ onNavigateToTab, onRefreshData }: SamsAgentP
         if (!queryTerm) {
           replyText = ' يرجى تحديد اسم أو رقم للبحث عنه. مثال: "بحث عن أحمد"';
         } else {
-          const results = students.filter(s => s.name.includes(queryTerm) || s.registration_id.includes(queryTerm) || s.national_id.includes(queryTerm));
+          const results = students.filter(s => s.name.includes(queryTerm) || s.registration_id.includes(queryTerm));
           if (results.length > 0) {
             replyText = ` تم العثور على ${results.length} طالب يطابق الاستعلام "${queryTerm}":`;
             replyData = {

@@ -32,15 +32,14 @@ export default function StudentExamPortal() {
     e.preventDefault();
     setErrorMsg('');
     const students = samsDb.getStudents();
-    // Allow login by national_id, barcode, or registration_id
+    // Allow login by barcode or registration_id
     const found = students.find(s => 
-      s.national_id === studentIdInput || 
       s.barcode === studentIdInput || 
       s.registration_id === studentIdInput
     );
 
     if (!found) {
-      setErrorMsg('بيانات الطالب غير صحيحة. تأكد من إدخال الرقم القومي أو الباركود بشكل صحيح.');
+      setErrorMsg('بيانات الطالب غير صحيحة. تأكد من إدخال رقم القيد أو الباركود بشكل صحيح.');
       return;
     }
 
@@ -97,11 +96,11 @@ export default function StudentExamPortal() {
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="text-center mb-4">
                 <h2 className="text-sm font-bold text-slate-700">تسجيل الدخول للامتحان</h2>
-                <p className="text-xs text-slate-500 mt-1">الرجاء إدخال رقم الباركود أو الرقم القومي أو رقم القيد الخاص بك.</p>
+                <p className="text-xs text-slate-500 mt-1">الرجاء إدخال رقم الباركود أو رقم القيد الخاص بك.</p>
               </div>
               <input
                 type="text"
-                placeholder="رقم الباركود أو الرقم القومي..."
+                placeholder="رقم الباركود أو رقم القيد..."
                 value={studentIdInput}
                 onChange={(e) => setStudentIdInput(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl p-3 text-center focus:border-[#0D5C8C] focus:ring-1 focus:ring-[#0D5C8C] outline-none font-mono"
