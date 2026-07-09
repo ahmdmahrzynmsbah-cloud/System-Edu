@@ -37,7 +37,8 @@ const KEYS = {
   EXAMS: 'sams_v2_exams',
   ASSIGNMENTS: 'sams_v2_assignments',
   EXAM_GRADES: 'sams_v2_exam_grades',
-  ASSIGNMENT_GRADES: 'sams_v2_assignment_grades'
+  ASSIGNMENT_GRADES: 'sams_v2_assignment_grades',
+  ANNOUNCEMENTS: 'sams_v2_announcements'
 };
 
 // AUTO-WIPE OLD MOCK DATA AT BOOT TO START CLEAN
@@ -674,6 +675,14 @@ export const samsDb = {
     saveToStorage(KEYS.NOTIFICATIONS, list);
     
     addAuditLog('INSERT', 'notifications', newNoti.id, `إرسال إشعار: (${noti.title}) متوجه إلى ${noti.recipient_type}`);
+    
+    // Also mirror to admin notification center so logged-in teachers/secretaries see it instantly
+    this.addAdminNotification({
+      type: 'system',
+      message: `📢 إشعار إداري: ${noti.title} - ${noti.message}`,
+      metadata: { system_notification_id: newNoti.id, recipient_type: noti.recipient_type, recipient_id: noti.recipient_id }
+    });
+
     return newNoti;
   },
 
@@ -835,5 +844,54 @@ export const samsDb = {
     const assignments = this.getAssignments();
     const assignTitle = assignments.find(a => a.id === grade.assignment_id)?.title || grade.assignment_id;
     addAuditLog('UPDATE', 'assignment_grades', updated.id, `رصد واجب الطالب (${studentName}) لـ (${assignTitle}): ${grade.completed ? `تم التسليم (الدرجة: ${grade.score})` : 'لم يتم التسليم'}`);
+  },
+
+  // ANNOUNCEMENTS
+  getAnnouncements(): import('../types').Announcement[] {
+    return loadFromStorage<import('../types').Announcement[]>(KEYS.ANNOUNCEMENTS, []);
+  },
+
+  saveAnnouncement(announcement: Omit<import('../types').Announcement, 'publish_date' | 'views_count'> & { publish_date?: string, views_count?: number }) {
+    const list = this.getAnnouncements();
+    const idx = list.findIndex(a => a.id === announcement.id);
+    const updated: import('../types').Announcement = {
+      ...announcement,
+      id: announcement.id || `ann-${Date.now()}`,
+      publish_date: announcement.publish_date || new Date().toISOString(),
+      views_count: announcement.views_count || 0
+    };
+    if (idx !== -1) {
+      list[idx] = updated;
+    } else {
+      list.unshift(updated);
+    }
+    saveToStorage(KEYS.ANNOUNCEMENTS, list);
+    addAuditLog(idx !== -1 ? 'UPDATE' : 'INSERT', 'announcements', updated.id, `${idx !== -1 ? 'تعديل' : 'إضافة'} إعلان بعنوان (${updated.title})`);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('sams_announcements_changed'));
+    }
+    return updated;
+  },
+
+  deleteAnnouncement(id: string) {
+    const list = this.getAnnouncements();
+    const item = list.find(a => a.id === id);
+    const filtered = list.filter(a => a.id !== id);
+    saveToStorage(KEYS.ANNOUNCEMENTS, filtered);
+    if (item) {
+      addAuditLog('DELETE', 'announcements', id, `حذف إعلان بعنوان (${item.title})`);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('sams_announcements_changed'));
+    }
+  },
+
+  incrementAnnouncementViews(id: string) {
+    const list = this.getAnnouncements();
+    const idx = list.findIndex(a => a.id === id);
+    if (idx !== -1) {
+      list[idx].views_count = (list[idx].views_count || 0) + 1;
+      saveToStorage(KEYS.ANNOUNCEMENTS, list);
+    }
   }
 };

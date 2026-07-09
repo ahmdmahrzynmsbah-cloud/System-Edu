@@ -214,3 +214,17 @@ export interface AdminNotification {
   read: boolean;
   metadata?: any;
 }
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  target_audience: 'all' | 'teachers' | 'students' | 'parents';
+  publish_date: string;
+  expiry_date?: string;
+  is_pinned: boolean;
+  status: 'active' | 'archived';
+  color_theme?: 'blue' | 'emerald' | 'amber' | 'rose' | 'indigo' | 'purple';
+  views_count?: number;
+}
+

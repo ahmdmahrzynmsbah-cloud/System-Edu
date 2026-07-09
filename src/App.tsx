@@ -54,6 +54,7 @@ import StudentBarcodes from './components/StudentBarcodes';
 import ExamsAndAssignments from './components/ExamsAndAssignments';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
+import AnnouncementsManager from './components/AnnouncementsManager';
 import { Settings, Search, ShieldCheck } from 'lucide-react';
 import { AdminNotification } from './types';
 import { Bell, CheckCheck, Trash2, Sun, Moon } from 'lucide-react';
@@ -63,7 +64,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { samsDb, getTenantSetting, saveToStorage } from './utils/db';
 import { subscribeToTenants } from './lib/tenantsApi';
 
-type TabType = 'dashboard' | 'students' | 'parents' | 'barcodes' | 'classes' | 'attendance' | 'fees' | 'notifications' | 'roles' | 'audit' | 'settings' | 'exams' | 'salaries' | 'privacy' | 'books';
+type TabType = 'dashboard' | 'students' | 'parents' | 'barcodes' | 'classes' | 'attendance' | 'fees' | 'notifications' | 'roles' | 'audit' | 'settings' | 'exams' | 'salaries' | 'privacy' | 'books' | 'announcements';
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -356,9 +357,23 @@ export default function App() {
     setAdminNotis(samsDb.getAdminNotifications());
   };
   
-  const displayedNotis = currentUserRole === 'secretary'
-    ? adminNotis.filter(n => !(n.message && n.message.includes('سجلت الإدارة')))
-    : adminNotis;
+  const displayedNotis = adminNotis.filter(n => {
+    // Hide administrative logs from secretary
+    if (currentUserRole === 'secretary' && n.message && n.message.includes('سجلت الإدارة')) {
+      return false;
+    }
+    // Filter system notifications based on specified target audience
+    if (n.type === 'system' && n.metadata?.recipient_type) {
+      const recType = n.metadata.recipient_type;
+      if (recType === 'teachers' && currentUserRole !== 'teacher') {
+        return false;
+      }
+      if (recType === 'specific' && n.metadata?.recipient_id && n.metadata.recipient_id !== currentUserId) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const unreadNotisCount = displayedNotis.filter(n => !n.read).length;
 
@@ -478,6 +493,7 @@ export default function App() {
         { id: 'salaries', label: 'المرتبات والمصروفات', roles: ['teacher'] },
         { id: 'fees', label: 'اشتراكات الشهر والحسابات', roles: ['teacher', 'secretary'] },
         { id: 'notifications', label: 'بث الرسائل وتواصل الآباء', roles: ['teacher', 'secretary'] },
+        { id: 'announcements', label: 'الإعلانات واللوحات الجدارية', roles: ['teacher', 'secretary'] },
       ]
     },
     {
@@ -512,7 +528,7 @@ export default function App() {
     
     const user = users.find(u => u.id === currentUserId);
     if (user && user.permissions && user.permissions.length > 0) {
-      const perms = [...user.permissions, 'books'];
+      const perms = [...user.permissions, 'books', 'announcements'];
       baseItems = fullNavItems.filter(item => perms.includes(item.id));
     } else {
       baseItems = fullNavItems.filter(item => item.roles.includes(currentUserRole || 'teacher'));
@@ -1070,6 +1086,7 @@ export default function App() {
             {activeTab === 'salaries' && <SalariesManager />}
             {activeTab === 'fees' && <FeesTracker />}
             {activeTab === 'notifications' && <NotificationsCenter />}
+            {activeTab === 'announcements' && <AnnouncementsManager />}
             {activeTab === 'roles' && <SystemRoles onRefreshAllData={forceRefresh} />}
             {activeTab === 'audit' && <SystemAuditLogs />}
             {activeTab === 'privacy' && <PrivacyPolicy />}
