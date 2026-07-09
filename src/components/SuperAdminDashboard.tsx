@@ -19,14 +19,14 @@ import {
 interface Tenant {
   id: string;
   name: string;
-  phone: string;
-  password: string;
+  phone?: string;
+  password?: string;
   status: 'active' | 'suspended';
   joinedDate: string;
-  expiryDate: string;
-  appName: string;
-  features: string[];
-  pricePaid: number;
+  expiryDate?: string;
+  appName?: string;
+  features?: string[];
+  pricePaid?: number;
   maxStudents?: number;
   maxSecretaries?: number;
   whatsappGatewayEnabled?: boolean;

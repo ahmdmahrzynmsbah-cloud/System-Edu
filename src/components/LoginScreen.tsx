@@ -26,6 +26,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   
   const [users, setUsers] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -76,6 +77,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           ]);
         }
       }
+      setIsLoadingData(false);
     };
     loadUsers();
     
@@ -145,10 +147,16 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       );
       if (found) {
         const secTenantId = found.tenantId || 'default';
-        const secTenant = tenants.find(t => t.id === secTenantId);
-        if (secTenant && secTenant.status === 'suspended') {
-            setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
-            return;
+        if (secTenantId !== 'default') {
+            const secTenant = tenants.find(t => t.id === secTenantId);
+            if (!secTenant) {
+                setError('يرجى الانتظار، جاري المزامنة. حاول مجدداً.');
+                return;
+            }
+            if (secTenant.status === 'suspended') {
+                setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
+                return;
+            }
         }
         localStorage.setItem('sams_current_tenant_id', secTenantId);
         onLoginSuccess('teacher', found.name, found.id);
@@ -174,10 +182,16 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       }
 
       if (matchedSec) {
-        const secTenant = tenants.find(t => t.id === secTenantId);
-        if (secTenant && secTenant.status === 'suspended') {
-            setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
-            return;
+        if (secTenantId !== 'default') {
+            const secTenant = tenants.find(t => t.id === secTenantId);
+            if (!secTenant) {
+                setError('يرجى الانتظار، جاري المزامنة. حاول مجدداً.');
+                return;
+            }
+            if (secTenant.status === 'suspended') {
+                setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
+                return;
+            }
         }
         localStorage.setItem('sams_current_tenant_id', secTenantId);
         onLoginSuccess('secretary', matchedSec.name, matchedSec.id);
@@ -191,10 +205,16 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     
     if (matchedUser) {
       const secTenantId = matchedUser.tenantId || 'default';
-      const secTenant = tenants.find(t => t.id === secTenantId);
-      if (secTenant && secTenant.status === 'suspended') {
-          setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
-          return;
+      if (secTenantId !== 'default') {
+          const secTenant = tenants.find(t => t.id === secTenantId);
+          if (!secTenant) {
+              setError('يرجى الانتظار، جاري المزامنة. حاول مجدداً.');
+              return;
+          }
+          if (secTenant.status === 'suspended') {
+              setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
+              return;
+          }
       }
       localStorage.setItem('sams_current_tenant_id', secTenantId);
       onLoginSuccess(role, finalName || matchedUser.name, matchedUser.id);
@@ -309,10 +329,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
             <button
               type="submit"
-              className="w-full py-3 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white text-xs font-black rounded-xl transition-all shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
+              disabled={isLoadingData}
+              className={`w-full py-3 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 ${isLoadingData ? 'bg-gray-400 cursor-not-allowed opacity-70' : 'bg-[#0D5C8C] hover:bg-[#1A7FAA] active:scale-98 cursor-pointer'}`}
             >
-              <Sparkles className="w-4 h-4" />
-              تأكيد الدخول وفتح لوحة العمل
+              <Sparkles className={`w-4 h-4 ${isLoadingData ? 'animate-pulse' : ''}`} />
+              {isLoadingData ? 'جاري تهيئة النظام...' : 'تأكيد الدخول وفتح لوحة العمل'}
             </button>
 
           </form>
