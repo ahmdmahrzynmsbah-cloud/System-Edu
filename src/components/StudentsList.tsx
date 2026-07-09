@@ -119,11 +119,13 @@ export default function StudentsList() {
 
   useEffect(() => {
     loadData();
+    window.addEventListener('sams_data_changed', loadData);
     const pendingSearch = localStorage.getItem('sams_global_search');
     if (pendingSearch) {
       setSearchTerm(pendingSearch);
       localStorage.removeItem('sams_global_search');
     }
+    return () => window.removeEventListener('sams_data_changed', loadData);
   }, []);
 
   const loadData = () => {

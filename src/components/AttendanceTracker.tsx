@@ -77,6 +77,7 @@ export default function AttendanceTracker() {
 
   useEffect(() => {
     loadData();
+    window.addEventListener('sams_data_changed', loadData);
     const interval = setInterval(loadData, 5000); // Polling for updates
     return () => clearInterval(interval);
   }, []);

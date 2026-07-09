@@ -1,3 +1,5 @@
+import { db } from './lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -148,6 +150,41 @@ export default function App() {
     });
 
     return () => unsubscribe();
+  }, [currentUserRole]);
+
+
+  // Global Realtime Sync
+  useEffect(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin') return;
+
+    const tenantId = localStorage.getItem('sams_current_tenant_id');
+    if (!tenantId || tenantId === 'default') return;
+
+    const KEYS = [
+      'sams_v2_students', 'sams_v2_teachers', 'sams_v2_classes', 'sams_v2_subjects',
+      'sams_v2_grades', 'sams_v2_attendance', 'sams_v2_fees', 'sams_v2_notifications',
+      'sams_v2_audit_logs', 'sams_v2_books', 'sams_v2_book_payments',
+      'sams_v2_exams', 'sams_v2_assignments', 'sams_v2_exam_grades', 'sams_v2_assignment_grades'
+    ];
+
+    const unsubscribes = KEYS.map(baseKey => {
+      const tenantKey = `${tenantId}_${baseKey}`;
+      return onSnapshot(doc(db, 'system_tenant_data', tenantKey), (snap) => {
+         if (snap.exists()) {
+             const remoteData = snap.data().data;
+             const localData = localStorage.getItem(tenantKey);
+             if (remoteData && remoteData !== localData) {
+                 localStorage.setItem(tenantKey, remoteData);
+                 // Trigger silent refresh via custom event
+                 window.dispatchEvent(new Event('sams_data_changed'));
+             }
+         }
+      });
+    });
+
+    return () => {
+       unsubscribes.forEach(u => u());
+    }
   }, [currentUserRole]);
 
   // Auto-logout effect when suspended
@@ -992,7 +1029,7 @@ export default function App() {
 
         {/* Viewport scroll area containing current Tab view */}
         <main className="flex-1 p-6 overflow-y-auto no-scrollbar w-full space-y-6">
-          <div key={`${activeTab}-${refreshTrigger}`} className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             {activeTab === 'dashboard' && <Dashboard onNavigateToTab={(tab) => { setActiveTab(tab as TabType); }} />}
             {activeTab === 'students' && <StudentsList />}
             {activeTab === 'parents' && <ParentsList />}

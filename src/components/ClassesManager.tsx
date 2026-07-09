@@ -34,6 +34,8 @@ export default function ClassesManager() {
 
   useEffect(() => {
     loadData();
+    window.addEventListener('sams_data_changed', loadData);
+    return () => window.removeEventListener('sams_data_changed', loadData);
   }, []);
 
   useEffect(() => {

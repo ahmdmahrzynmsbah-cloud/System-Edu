@@ -38,11 +38,16 @@ export default function SystemAuditLogs() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    setAuditLogs(samsDb.getAuditLogs());
-    const saved = localStorage.getItem('sams_system_users');
-    if (saved) {
-      setSystemUsers(JSON.parse(saved));
-    }
+    const handleDataLoad = () => {
+      setAuditLogs(samsDb.getAuditLogs());
+      const saved = localStorage.getItem('sams_system_users');
+      if (saved) {
+        setSystemUsers(JSON.parse(saved));
+      }
+    };
+    handleDataLoad();
+    window.addEventListener('sams_data_changed', handleDataLoad);
+    return () => window.removeEventListener('sams_data_changed', handleDataLoad);
   }, []);
 
   useEffect(() => {

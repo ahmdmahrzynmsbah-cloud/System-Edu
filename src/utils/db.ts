@@ -1,3 +1,5 @@
+import { db } from '../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -152,7 +154,17 @@ function loadFromStorage<T>(key: string, defaultVal: T): T {
 
 function saveToStorage<T>(key: string, data: T) {
   const tenantKey = getTenantKey(key);
-  localStorage.setItem(tenantKey, JSON.stringify(data));
+  const serialized = JSON.stringify(data);
+  localStorage.setItem(tenantKey, serialized);
+  
+  // Realtime sync to Firebase for this tenant
+  const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
+  if (tenantId !== 'super-admin') {
+    setDoc(doc(db, 'system_tenant_data', tenantKey), {
+      data: serialized,
+      updatedAt: Date.now()
+    }).catch(err => console.error('Firebase sync error:', err));
+  }
 }
 
 // SIMULATE TIME STAMP

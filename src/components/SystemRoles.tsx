@@ -53,7 +53,16 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
   };
 
   useEffect(() => {
-    loadUsers();
+    const currentTenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
+    const unsubscribe = subscribeToSystemUsers(currentTenantId, (dbUsers) => {
+      if (dbUsers.length > 0) {
+        setUsers(dbUsers);
+      } else {
+        // Fallback to local storage migration if no users exist in db
+        loadUsers();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {

@@ -15,6 +15,13 @@ interface DashboardProps {
 
 export default function Dashboard({ onNavigateToTab }: DashboardProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [, setForceRender] = useState(0);
+
+  useEffect(() => {
+    const handleDataChange = () => setForceRender(prev => prev + 1);
+    window.addEventListener('sams_data_changed', handleDataChange);
+    return () => window.removeEventListener('sams_data_changed', handleDataChange);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
