@@ -725,7 +725,7 @@ export default function StudentBarcodes() {
                 <div className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 flex flex-col items-center justify-center gap-1.5">
                   <div id={`print-barcode-view-${student.id}`} className="w-full">
                     {/* Width adjusted for better rendering in grid */}
-                    <Barcode value={student.registration_id} height={32} showText={true} renderType={renderType} />
+                    <Barcode value={student.barcode || student.registration_id} height={32} showText={true} renderType={renderType} />
                   </div>
                 </div>
 

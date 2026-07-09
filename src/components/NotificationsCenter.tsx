@@ -1,3 +1,4 @@
+import { saveToStorage } from "../utils/db";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -73,9 +74,9 @@ export default function NotificationsCenter() {
   const [settingsSavedMsg, setSettingsSavedMsg] = useState(false);
 
   const saveWpSettings = () => {
-    localStorage.setItem('sams_callmebot_api_key', callmebotKeyValue.trim());
-    localStorage.setItem('sams_ultramsg_instance_id', ultramsgIdValue.trim());
-    localStorage.setItem('sams_ultramsg_token', ultramsgTokenValue.trim());
+    saveToStorage('sams_callmebot_api_key', callmebotKeyValue.trim());
+    saveToStorage('sams_ultramsg_instance_id', ultramsgIdValue.trim());
+    saveToStorage('sams_ultramsg_token', ultramsgTokenValue.trim());
     setSettingsSavedMsg(true);
     setTimeout(() => setSettingsSavedMsg(false), 3000);
   };

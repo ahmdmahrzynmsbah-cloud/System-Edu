@@ -39,8 +39,7 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
     { id: 'fees', label: 'اشتراكات الشهر والحسابات' },
     { id: 'notifications', label: 'بث الرسائل وتواصل الآباء' },
     { id: 'roles', label: 'الصلاحيات وتدقيق الأمان' },
-    { id: 'audit', label: 'سجل المعاملات الحية' },
-    { id: 'settings', label: 'إعدادات المنصة' }
+    { id: 'audit', label: 'سجل المعاملات الحية' }
   ];
 
   const handleTogglePermission = (tabId: string) => {

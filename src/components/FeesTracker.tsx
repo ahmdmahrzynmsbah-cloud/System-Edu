@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Student, FeePayment, ClassRoom } from '../types';
-import { samsDb, addAuditLog } from '../utils/db';
+import { samsDb, addAuditLog, saveToStorage } from '../utils/db';
 import { 
   Check, 
   ShieldAlert, 
@@ -193,7 +193,7 @@ export default function FeesTracker() {
   const handleSaveGradeFee = (gradeLevel: string, amount: number) => {
     const updated = { ...gradeFees, [gradeLevel]: amount };
     setGradeFees(updated);
-    localStorage.setItem('sams_grade_monthly_fees', JSON.stringify(updated));
+    saveToStorage('sams_grade_monthly_fees', updated);
     setSuccessInfo(`تم تحديث قيمة اشتراك الصف بنجاح لتصبح: ${amount} ج.م`);
     playSuccessBeep();
   };
@@ -291,7 +291,7 @@ export default function FeesTracker() {
     const paymentId = paymentToDelete.id;
 
     const filtered = fees.filter(f => f.id !== paymentId);
-    localStorage.setItem('sams_v2_fees', JSON.stringify(filtered));
+    saveToStorage('sams_v2_fees', filtered);
     
     // Log audit
     const student = students.find(s => s.id === paymentToDelete.student_id);

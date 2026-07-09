@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Exam, Assignment, ExamGrade, AssignmentGrade, Student, ClassRoom } from '../types';
-import { samsDb } from '../utils/db';
+import { samsDb , saveToStorage } from '../utils/db';
 import {
   Check,
   X,
@@ -56,7 +56,10 @@ export default function ExamsAndAssignments() {
     duration_mins: 30,
     date: new Date().toISOString().split('T')[0],
     class_id: '',
-    term: 'first_term' as Exam['term']
+    term: 'first_term' as Exam['term'],
+    mode: 'center' as 'center' | 'online',
+    exam_url: '',
+    auto_attendance: false
   });
 
   // Input states for Assignment creation/editing
@@ -113,6 +116,8 @@ export default function ExamsAndAssignments() {
   // Load all initial data from Database
   useEffect(() => {
     loadAllData();
+    window.addEventListener('sams_data_changed', loadAllData);
+    return () => window.removeEventListener('sams_data_changed', loadAllData);
   }, []);
 
   const loadAllData = () => {
@@ -279,7 +284,10 @@ export default function ExamsAndAssignments() {
       duration_mins: Number(examForm.duration_mins),
       date: examForm.date,
       class_id: examForm.class_id,
-      term: examForm.term
+      term: examForm.term,
+      mode: examForm.mode,
+      exam_url: examForm.exam_url,
+      auto_attendance: examForm.auto_attendance
     };
 
     samsDb.saveExam(examData);
@@ -292,7 +300,10 @@ export default function ExamsAndAssignments() {
       duration_mins: 30,
       date: new Date().toISOString().split('T')[0],
       class_id: classes[0]?.id || '',
-      term: 'first_term'
+      term: 'first_term',
+      mode: 'center',
+      exam_url: '',
+      auto_attendance: false
     });
     loadAllData();
   };
@@ -307,7 +318,10 @@ export default function ExamsAndAssignments() {
       duration_mins: exam.duration_mins,
       date: exam.date,
       class_id: exam.class_id,
-      term: exam.term
+      term: exam.term,
+      mode: exam.mode || 'center',
+      exam_url: exam.exam_url || '',
+      auto_attendance: exam.auto_attendance || false
     });
     // Scroll to top of tab
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -319,7 +333,7 @@ export default function ExamsAndAssignments() {
       samsDb.deleteExam(examToDelete.id);
       // Clean grades as well (optional but clean database)
       const list = samsDb.getExamGrades().filter(g => g.exam_id !== examToDelete.id);
-      localStorage.setItem('sams_v2_exam_grades', JSON.stringify(list));
+      saveToStorage('sams_v2_exam_grades', list);
       
       setSuccessMsg('تم حذف الامتحان وسجل درجاته بنجاح!');
       setExamToDelete(null);
@@ -383,7 +397,7 @@ export default function ExamsAndAssignments() {
     if (assignmentToDelete) {
       samsDb.deleteAssignment(assignmentToDelete.id);
       const list = samsDb.getAssignmentGrades().filter(g => g.assignment_id !== assignmentToDelete.id);
-      localStorage.setItem('sams_v2_assignment_grades', JSON.stringify(list));
+      saveToStorage('sams_v2_assignment_grades', list);
 
       setSuccessMsg('تم حذف الواجب وسجلات الطلاب بنجاح!');
       setAssignmentToDelete(null);
@@ -1174,6 +1188,46 @@ export default function ExamsAndAssignments() {
                 />
               </div>
 
+              {/* Mode & URL */}
+              <div className="space-y-3 pt-2 border-t border-slate-50">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">طريقة أداء الامتحان</label>
+                  <select
+                    value={examForm.mode}
+                    onChange={(e) => setExamForm({ ...examForm, mode: e.target.value as any })}
+                    className="w-full text-right text-xs border border-slate-200 p-2.5 rounded-xl bg-white"
+                  >
+                    <option value="center">في السنتر (حضور فعلي)</option>
+                    <option value="online">أونلاين (رابط إلكتروني)</option>
+                  </select>
+                </div>
+                {examForm.mode === 'online' && (
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700">رابط الامتحان (Google Forms / وغيرها)</label>
+                    <input
+                      type="url"
+                      placeholder="https://docs.google.com/forms/d/e/..."
+                      value={examForm.exam_url}
+                      onChange={(e) => setExamForm({ ...examForm, exam_url: e.target.value })}
+                      className="w-full text-left border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-hidden focus:border-[#0D5C8C]"
+                      dir="ltr"
+                    />
+                    <p className="text-[10px] text-slate-500 font-sans">
+                      * يمكنك استيراد درجات هذا الامتحان لاحقاً من ملف إكسيل (CSV) بضغطة زر.
+                    </p>
+                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={examForm.auto_attendance}
+                        onChange={(e) => setExamForm({ ...examForm, auto_attendance: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="text-xs font-bold text-slate-700">تسجيل حضور الطالب تلقائياً عند إنهاء الامتحان الأونلاين</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Submit Buttons */}
               <div className="pt-2 flex gap-2">
                 <button
@@ -1289,6 +1343,13 @@ export default function ExamsAndAssignments() {
                         <div className="text-[10px] text-emerald-600 font-bold">
                           تم رصد درجات ({gradedCount}) طلاب لهذه المادة.
                         </div>
+                        {exam.mode === 'online' && (
+                          <div className="mt-2 text-[10px]">
+                            <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold ml-2 border border-amber-200">أونلاين</span>
+                            <span className="text-slate-500 font-mono select-all break-all">{window.location.origin}/?exam_id={exam.id}</span>
+                            <p className="text-slate-400 mt-1">انسخ هذا الرابط وأرسله للطلاب لأداء الامتحان وتسجيل درجاتهم تلقائياً.</p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Controls */}

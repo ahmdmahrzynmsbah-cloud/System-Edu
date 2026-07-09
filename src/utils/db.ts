@@ -70,7 +70,7 @@ try {
 }
 
 // TENANT KEY ISOLATION HELPERS
-function getTenantKey(key: string): string {
+export function getTenantKey(key: string): string {
   if (
     key === 'sams_system_tenants' || 
     key === 'sams_current_tenant_id' || 
@@ -91,11 +91,23 @@ export function getTenantSetting(key: string, defaultValue: string): string {
   }
   const prefix = tenantId !== 'default' ? `${tenantId}_` : '';
   const tenantValue = localStorage.getItem(`${prefix}${key}`);
-  if (tenantValue) return tenantValue;
+  if (tenantValue) {
+    try {
+      const parsed = JSON.parse(tenantValue);
+      if (typeof parsed === 'string') return parsed;
+    } catch (e) {}
+    return tenantValue;
+  }
   
   // Backwards compatibility fallback for default or global keys
   const globalValue = localStorage.getItem(key);
-  if (globalValue && tenantId === 'default') return globalValue;
+  if (globalValue && tenantId === 'default') {
+    try {
+      const parsed = JSON.parse(globalValue);
+      if (typeof parsed === 'string') return parsed;
+    } catch (e) {}
+    return globalValue;
+  }
 
   // If this is a specific tenant, check if we have their appName from the system tenants list
   if (tenantId !== 'default' && key === 'sams_custom_app_name_v2') {
@@ -152,7 +164,7 @@ function loadFromStorage<T>(key: string, defaultVal: T): T {
   }
 }
 
-function saveToStorage<T>(key: string, data: T) {
+export function saveToStorage<T>(key: string, data: T) {
   const tenantKey = getTenantKey(key);
   const serialized = JSON.stringify(data);
   localStorage.setItem(tenantKey, serialized);
@@ -161,6 +173,8 @@ function saveToStorage<T>(key: string, data: T) {
   const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
   if (tenantId !== 'super-admin') {
     setDoc(doc(db, 'system_tenant_data', tenantKey), {
+      tenantId: tenantId,
+      key: key,
       data: serialized,
       updatedAt: Date.now()
     }).catch(err => console.error('Firebase sync error:', err));

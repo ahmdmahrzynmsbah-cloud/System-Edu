@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ClassRoom, Teacher, Subject, CenterScheduleData, Student } from '../types';
 import { samsDb } from '../utils/db';
-import { Plus, BookOpen, User, Maximize2, Search, ShieldAlert, Check, Calendar, Trash2, CheckCircle } from 'lucide-react';
+import { Plus, BookOpen, User, Users, Maximize2, Search, ShieldAlert, Check, Calendar, Trash2, CheckCircle, X, ExternalLink, Eye, ArrowRight, Phone, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ClassesManager() {
@@ -31,6 +32,9 @@ export default function ClassesManager() {
   const [schedule, setSchedule] = useState<CenterScheduleData | null>(null);
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<CenterScheduleData | null>(null);
+  const [selectedClassView, setSelectedClassView] = useState<ClassRoom | null>(null);
+  const [selectedStudentDetails, setSelectedStudentDetails] = useState<Student | null>(null);
+
 
   useEffect(() => {
     loadData();
@@ -119,8 +123,186 @@ export default function ClassesManager() {
     loadData();
   };
 
+
+  if (selectedClassView) {
+    const classStudents = students.filter(s => s.class_id === selectedClassView.id);
+    
+    return (
+      <div className="space-y-6 animate-fade-in" dir="rtl">
+        <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-4">
+                <button 
+                    onClick={() => setSelectedClassView(null)}
+                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors cursor-pointer"
+                >
+                    <ArrowRight className="w-5 h-5" />
+                </button>
+                <div>
+                    <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                        مجموعة: {selectedClassView.name}
+                    </h2>
+                    <p className="text-sm text-slate-500 font-medium mt-1">
+                        {selectedClassView.grade_level} • {classStudents.length} طلاب مسجلين
+                    </p>
+                </div>
+            </div>
+            
+            <div className="flex gap-2">
+                <span className="bg-blue-50 text-[#0D5C8C] px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 border border-blue-100">
+                    <Calendar className="w-4 h-4" />
+                    {selectedClassView.schedule_days ? `${selectedClassView.schedule_days} - ${selectedClassView.schedule_time}` : 'المواعيد غير محددة'}
+                </span>
+            </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800 text-lg">قائمة الطلاب</h3>
+            </div>
+            <div className="p-0">
+                {classStudents.length === 0 ? (
+                    <div className="text-center p-12 text-slate-400 font-medium">لا يوجد طلاب مسجلين في هذه المجموعة حتى الآن.</div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-right">
+                            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-sm">
+                                <tr>
+                                    <th className="p-4 font-bold">اسم الطالب</th>
+                                    <th className="p-4 font-bold">رقم القيد</th>
+                                    <th className="p-4 font-bold">رقم الهاتف</th>
+                                    <th className="p-4 font-bold">الحالة</th>
+                                    <th className="p-4 font-bold text-center">التفاصيل</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {classStudents.map(student => (
+                                    <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="p-4 font-bold text-slate-800">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 text-[#0D5C8C] flex items-center justify-center font-bold text-sm">
+                                                    {student.name.charAt(0)}
+                                                </div>
+                                                {student.name}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 font-mono text-sm text-slate-600">{student.registration_id}</td>
+                                        <td className="p-4 text-sm text-slate-600" dir="ltr">
+                                            {student.phone || '-'}
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                                                student.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 
+                                                student.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700'
+                                            }`}>
+                                                {student.status === 'active' ? 'نشط' : student.status === 'suspended' ? 'موقوف' : 'مؤجل'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <button
+                                                onClick={() => setSelectedStudentDetails(student)}
+                                                className="p-2 text-slate-400 hover:text-[#0D5C8C] hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                                title="عرض تفاصيل الطالب"
+                                            >
+                                                <Eye className="w-5 h-5" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Student Details Modal */}
+        {createPortal(
+            <AnimatePresence>
+                {selectedStudentDetails && (
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                            className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+                            dir="rtl"
+                        >
+                            <div className="bg-gradient-to-l from-[#0D5C8C] to-sky-700 p-6 text-white relative">
+                                <button 
+                                    onClick={() => setSelectedStudentDetails(null)}
+                                    className="absolute top-4 left-4 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors cursor-pointer"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl font-extrabold text-[#0D5C8C] mb-4 shadow-lg">
+                                    {selectedStudentDetails.name.charAt(0)}
+                                </div>
+                                <h3 className="text-2xl font-bold">{selectedStudentDetails.name}</h3>
+                                <p className="text-sky-100 mt-1 flex items-center gap-2">
+                                    <span className="font-mono bg-black/20 px-2 py-0.5 rounded text-sm">{selectedStudentDetails.registration_id}</span>
+                                    <span>{selectedStudentDetails.grade_level}</span>
+                                </p>
+                            </div>
+                            
+                            <div className="p-6 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                            <Phone className="w-4 h-4" />
+                                            <span className="text-xs font-bold">هاتف الطالب</span>
+                                        </div>
+                                        <p className="font-mono text-slate-800 text-sm" dir="ltr">{selectedStudentDetails.phone || 'غير مسجل'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                            <Phone className="w-4 h-4 text-amber-500" />
+                                            <span className="text-xs font-bold">هاتف ولي الأمر</span>
+                                        </div>
+                                        <p className="font-mono text-slate-800 text-sm" dir="ltr">{selectedStudentDetails.parent_phone || 'غير مسجل'}</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                    <div className="flex items-center gap-2 text-slate-500 mb-2">
+                                        <Info className="w-4 h-4" />
+                                        <span className="text-xs font-bold">معلومات إضافية</span>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-500">الرقم القومي:</span>
+                                            <span className="font-mono text-slate-800">{selectedStudentDetails.national_id || 'غير مسجل'}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-500">حالة الحساب:</span>
+                                            <span className={`font-bold ${
+                                                selectedStudentDetails.status === 'active' ? 'text-emerald-600' : 
+                                                selectedStudentDetails.status === 'suspended' ? 'text-red-600' : 'text-slate-600'
+                                            }`}>
+                                                {selectedStudentDetails.status === 'active' ? 'نشط' : selectedStudentDetails.status === 'suspended' ? 'موقوف' : 'مؤجل'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-500">تاريخ الانضمام:</span>
+                                            <span className="text-slate-800 font-mono">
+                                                {new Date(selectedStudentDetails.created_at).toLocaleDateString('ar-EG')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>,
+            document.body
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" id="sams_classes_module">
+
       
       {/* Title block */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs">
@@ -254,7 +436,7 @@ export default function ClassesManager() {
         <div className="relative flex-1 w-full">
           <input
             type="text"
-            placeholder="ابحث باسم المجموعة..."
+            placeholder="ابحث باسم المجموعة أو الموعد أو الأيام..."
             value={classSearchQuery}
             onChange={(e) => setClassSearchQuery(e.target.value)}
             className="w-full text-right pr-9 pl-3 h-10 text-xs border border-slate-200 rounded-xl focus:border-[#1A7FAA] focus:ring-1 focus:ring-[#1A7FAA] outline-hidden"
@@ -280,7 +462,15 @@ export default function ClassesManager() {
       {/* Class list Grid cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {classes
-          .filter(cls => (classGradeFilter === 'all' || cls.grade_level === classGradeFilter) && cls.name.toLowerCase().includes(classSearchQuery.toLowerCase()))
+          .filter(cls => {
+            const matchesGrade = classGradeFilter === 'all' || cls.grade_level === classGradeFilter;
+            const q = classSearchQuery.toLowerCase();
+            const matchesSearch = 
+              (cls.name && cls.name.toLowerCase().includes(q)) || 
+              (cls.schedule_days && cls.schedule_days.toLowerCase().includes(q)) || 
+              (cls.schedule_time && cls.schedule_time.toLowerCase().includes(q));
+            return matchesGrade && matchesSearch;
+          })
           .map((cls) => {
           
           const currentSubjects = subjects.filter(s => s.class_id === cls.id);
@@ -292,6 +482,7 @@ export default function ClassesManager() {
               <div className="flex items-center justify-between border-b border-gray-50 pb-3">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-slate-800 text-sm">{cls.name}</h3>
+
                   <button
                     onClick={() => setClassToDelete(cls)}
                     className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
@@ -348,6 +539,15 @@ export default function ClassesManager() {
                 )}
               </div>
 
+              <div className="pt-3 mt-2 border-t border-slate-50">
+                <button
+                  onClick={() => setSelectedClassView(cls)}
+                  className="w-full bg-slate-50 hover:bg-[#0D5C8C] text-[#0D5C8C] hover:text-white transition-colors py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold cursor-pointer border border-slate-200 shadow-sm"
+                >
+                  <Users className="w-4 h-4" />
+                  عرض تفاصيل الطلاب
+                </button>
+              </div>
             </div>
           );
         })}
@@ -521,6 +721,9 @@ export default function ClassesManager() {
           </div>
         )}
       </AnimatePresence>
+
+
+
 
     </div>
   );

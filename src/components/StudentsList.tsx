@@ -113,6 +113,7 @@ export default function StudentsList() {
     phone: '',
     parent_name: '',
     parent_phone: '',
+    barcode: '',
     notes: '',
     status: 'active' as Student['status']
   });
@@ -166,6 +167,7 @@ export default function StudentsList() {
           phone: '',
           parent_name: '',
           parent_phone: '',
+          barcode: '',
           notes: '',
           status: 'active'
         });
@@ -209,6 +211,7 @@ export default function StudentsList() {
       phone: student.phone,
       parent_name: student.parent_name,
       parent_phone: student.parent_phone,
+      barcode: student.barcode || '',
       notes: student.notes || '',
       status: student.status
     });
@@ -237,7 +240,11 @@ export default function StudentsList() {
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.includes(searchTerm) || s.registration_id.includes(searchTerm);
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = 
+      (s.name && s.name.toLowerCase().includes(searchLower)) || 
+      (s.registration_id && s.registration_id.toLowerCase().includes(searchLower)) ||
+      (s.barcode && s.barcode.toLowerCase().includes(searchLower));
     const matchesClass = classFilter === 'all' || s.class_id === classFilter;
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     const matchesGrade = gradeFilter === 'all' || s.grade_level === gradeFilter;
@@ -265,7 +272,7 @@ export default function StudentsList() {
               setIsEditing(false);
               setFormData({
                 name: '', class_id: classes[0]?.id || '', grade_level: 'الأول الإعدادي', 
-                birth_date: '2016-01-01', phone: '', parent_name: '', parent_phone: '', notes: '', status: 'active'
+                birth_date: '2016-01-01', phone: '', parent_name: '', parent_phone: '', barcode: '', notes: '', status: 'active'
               });
               setShowAddForm(!showAddForm);
               setErrorMessage('');
@@ -350,6 +357,10 @@ export default function StudentsList() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-600 block">رقم هاتف ولي الأمر (للطوارئ)</label>
                   <input type="tel" name="parent_phone" value={formData.parent_phone} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none" placeholder="01X XXXX XXXX" dir="ltr" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600 block">باركود الطالب <span className="text-slate-400 font-normal">- اختياري</span></label>
+                  <input type="text" name="barcode" value={formData.barcode} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none" placeholder="أدخل كود الباركود هنا أو قم بمسحه..." dir="ltr" />
                 </div>
                 <div className="space-y-1.5 lg:col-span-3">
                   <label className="text-xs font-semibold text-slate-600 block">المذكرات (الكتب والملازم التي استلمها الطالب) <span className="text-slate-400 font-normal">- اختياري</span></label>

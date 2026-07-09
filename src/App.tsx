@@ -1,5 +1,5 @@
 import { db } from './lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -48,6 +48,7 @@ import NotificationsCenter from './components/NotificationsCenter';
 import SystemRoles from './components/SystemRoles';
 import SystemAuditLogs from './components/SystemAuditLogs';
 import LoginScreen from './components/LoginScreen';
+import StudentExamPortal from './components/StudentExamPortal';
 import SettingsManager from './components/SettingsManager';
 import StudentBarcodes from './components/StudentBarcodes';
 import ExamsAndAssignments from './components/ExamsAndAssignments';
@@ -59,12 +60,17 @@ import { Bell, CheckCheck, Trash2, Sun, Moon } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
 
-import { samsDb, getTenantSetting } from './utils/db';
+import { samsDb, getTenantSetting, saveToStorage } from './utils/db';
 import { subscribeToTenants } from './lib/tenantsApi';
 
 type TabType = 'dashboard' | 'students' | 'parents' | 'barcodes' | 'classes' | 'attendance' | 'fees' | 'notifications' | 'roles' | 'audit' | 'settings' | 'exams' | 'salaries' | 'privacy' | 'books';
 
 export default function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('exam_id')) {
+    return <StudentExamPortal />;
+  }
+
   // Initial loading states
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -83,9 +89,22 @@ export default function App() {
         }
         
         // Get the current custom app name if defined, else use default
-        const sysName = localStorage.getItem('sams_current_tenant_id') === 'super-admin' ? 
-          'إدارة Fox System المركزية' : 
-          (localStorage.getItem(localStorage.getItem('sams_current_tenant_id') !== 'default' && localStorage.getItem('sams_current_tenant_id') ? `${localStorage.getItem('sams_current_tenant_id')}_sams_custom_app_name_v2` : 'sams_custom_app_name_v2') || 'Fox System');
+        let sysName = 'Fox System';
+        if (localStorage.getItem('sams_current_tenant_id') === 'super-admin') {
+          sysName = 'إدارة Fox System المركزية';
+        } else {
+          const tId = localStorage.getItem('sams_current_tenant_id');
+          const raw = localStorage.getItem(tId && tId !== 'default' ? `${tId}_sams_custom_app_name_v2` : 'sams_custom_app_name_v2');
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (typeof parsed === 'string') sysName = parsed;
+              else sysName = raw;
+            } catch (e) {
+              sysName = raw;
+            }
+          }
+        }
 
         // Random fluid progress increment
         const nextProgress = prev + Math.floor(Math.random() * 12) + 4;
@@ -160,31 +179,28 @@ export default function App() {
     const tenantId = localStorage.getItem('sams_current_tenant_id');
     if (!tenantId || tenantId === 'default') return;
 
-    const KEYS = [
-      'sams_v2_students', 'sams_v2_teachers', 'sams_v2_classes', 'sams_v2_subjects',
-      'sams_v2_grades', 'sams_v2_attendance', 'sams_v2_fees', 'sams_v2_notifications',
-      'sams_v2_audit_logs', 'sams_v2_books', 'sams_v2_book_payments',
-      'sams_v2_exams', 'sams_v2_assignments', 'sams_v2_exam_grades', 'sams_v2_assignment_grades'
-    ];
+    const q = query(
+      collection(db, 'system_tenant_data'),
+      where('tenantId', '==', tenantId)
+    );
 
-    const unsubscribes = KEYS.map(baseKey => {
-      const tenantKey = `${tenantId}_${baseKey}`;
-      return onSnapshot(doc(db, 'system_tenant_data', tenantKey), (snap) => {
-         if (snap.exists()) {
-             const remoteData = snap.data().data;
-             const localData = localStorage.getItem(tenantKey);
-             if (remoteData && remoteData !== localData) {
-                 localStorage.setItem(tenantKey, remoteData);
-                 // Trigger silent refresh via custom event
-                 window.dispatchEvent(new Event('sams_data_changed'));
-             }
-         }
-      });
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+       let changed = false;
+       snapshot.docs.forEach(docSnap => {
+          const remoteData = docSnap.data().data;
+          const docKey = docSnap.id;
+          const localData = localStorage.getItem(docKey);
+          if (remoteData && remoteData !== localData) {
+              localStorage.setItem(docKey, remoteData);
+              changed = true;
+          }
+       });
+       if (changed) {
+          window.dispatchEvent(new Event('sams_data_changed'));
+       }
     });
 
-    return () => {
-       unsubscribes.forEach(u => u());
-    }
+    return () => unsubscribe();
   }, [currentUserRole]);
 
   // Auto-logout effect when suspended
@@ -260,7 +276,7 @@ export default function App() {
       return n;
     });
     if (updatedNotis) {
-      localStorage.setItem('sams_admin_notifications', JSON.stringify(notisData));
+      saveToStorage('sams_admin_notifications', notisData);
     }
 
     // Load initially
@@ -363,18 +379,20 @@ export default function App() {
     const cleanQuery = searchQuery.trim().toLowerCase();
     
     const studentsRes = samsDb.getStudents().filter(s => 
-      s.name.toLowerCase().includes(cleanQuery) ||
-      s.registration_id.toLowerCase().includes(cleanQuery) ||
-      s.phone.toLowerCase().includes(cleanQuery) ||
+      (s.name && s.name.toLowerCase().includes(cleanQuery)) ||
+      (s.registration_id && s.registration_id.toLowerCase().includes(cleanQuery)) ||
+      (s.phone && s.phone.toLowerCase().includes(cleanQuery)) ||
       (s.parent_name && s.parent_name.toLowerCase().includes(cleanQuery)) ||
-      s.national_id.includes(cleanQuery)
+      (s.parent_phone && s.parent_phone.toLowerCase().includes(cleanQuery)) ||
+      (s.national_id && s.national_id.includes(cleanQuery)) ||
+      (s.barcode && s.barcode.toLowerCase().includes(cleanQuery))
     ).slice(0, 5);
 
     const teachersRes = samsDb.getTeachers().filter(t => 
-      t.name.toLowerCase().includes(cleanQuery) ||
-      t.specialization.toLowerCase().includes(cleanQuery) ||
-      t.phone.toLowerCase().includes(cleanQuery) ||
-      t.national_id.includes(cleanQuery)
+      (t.name && t.name.toLowerCase().includes(cleanQuery)) ||
+      (t.specialization && t.specialization.toLowerCase().includes(cleanQuery)) ||
+      (t.phone && t.phone.toLowerCase().includes(cleanQuery)) ||
+      (t.national_id && t.national_id.includes(cleanQuery))
     ).slice(0, 3);
 
     return { students: studentsRes, teachers: teachersRes };
@@ -473,7 +491,7 @@ export default function App() {
       ]
     },
     { id: 'privacy', label: 'سياسة الخصوصية', icon: <ShieldCheck className="w-4 h-4" />, roles: ['teacher', 'secretary'] },
-    { id: 'settings', label: 'إعدادات المنصة', icon: <Settings className="w-4 h-4" />, roles: ['teacher'] }
+    { id: 'settings', label: 'إعدادات السنتر', icon: <Settings className="w-4 h-4" />, roles: ['teacher'] }
   ];
 
   // Flat list for checking permissions
@@ -499,6 +517,11 @@ export default function App() {
     } else {
       baseItems = fullNavItems.filter(item => item.roles.includes(currentUserRole || 'teacher'));
     }
+    
+    // المدرس المشترك في السيستم (المالك) هو الوحيد اللي بيظهرله الإعدادات
+    if (user) {
+      baseItems = baseItems.filter(item => item.id !== 'settings');
+    }
 
     // Tenant custom feature mask filter
     const tenantId = localStorage.getItem('sams_current_tenant_id');
@@ -509,7 +532,7 @@ export default function App() {
           const tenants = JSON.parse(savedTenants);
           const currentTenant = tenants.find((t: any) => t.id === tenantId);
           if (currentTenant && currentTenant.features) {
-            const allowedIds = [...currentTenant.features, 'privacy', 'books'];
+            const allowedIds = [...currentTenant.features, 'privacy', 'books', 'settings'];
             return baseItems.filter(item => allowedIds.includes(item.id));
           }
         }
@@ -655,10 +678,16 @@ export default function App() {
         
         {/* Logo Brand Header */}
         <div className={`py-5 px-4 border-b border-[#1A7FAA]/30 shrink-0 select-none bg-[#0a4d75] flex flex-col items-center justify-center text-center w-full transition-all duration-300 ${isSidebarCollapsed ? 'hidden' : 'flex'}`}>
-          <div className="w-14 h-14 bg-gradient-to-tr from-[#1A7FAA] to-[#F5C453] rounded-full flex items-center justify-center shadow-lg text-white mb-3 ring-4 ring-white/10">
-            <GraduationCap className="w-8 h-8 text-white stroke-[1.5]" />
+          <div className="w-14 h-14 bg-white/10 rounded-full flex items-center justify-center shadow-lg text-white mb-3 ring-4 ring-white/10 overflow-hidden">
+            {customAppLogo && customAppLogo.length > 5 ? (
+              <img src={customAppLogo} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-tr from-[#1A7FAA] to-[#F5C453] flex items-center justify-center">
+                <GraduationCap className="w-8 h-8 text-white stroke-[1.5]" />
+              </div>
+            )}
           </div>
-          <h1 className="text-xl font-extrabold text-white tracking-wide">Fox System</h1>
+          <h1 className="text-xl font-extrabold text-white tracking-wide">{customAppName}</h1>
           <p className="text-xs font-semibold text-[#FCF6BA] mt-1.5 px-3 py-1 bg-white/10 rounded-full select-none">لادارة السناتر التعليمية</p>
         </div>
 

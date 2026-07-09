@@ -1,3 +1,5 @@
+import { db } from "../lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { getAllTenants, saveTenant, deleteTenant, subscribeToTenants } from "../lib/tenantsApi";
 /**
  * @license
@@ -431,15 +433,16 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
     
     // Seed blank structures for this new tenant
     const prefix = `${newTenant.id}_`;
-    localStorage.setItem(`${prefix}sams_v2_students`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_teachers`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_classes`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_fees`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_attendance`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_exams`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_assignments`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_exam_grades`, '[]');
-    localStorage.setItem(`${prefix}sams_v2_assignment_grades`, '[]');
+    const keys = ['sams_v2_students', 'sams_v2_teachers', 'sams_v2_classes', 'sams_v2_fees', 'sams_v2_attendance', 'sams_v2_exams', 'sams_v2_assignments', 'sams_v2_exam_grades', 'sams_v2_assignment_grades'];
+    keys.forEach(k => {
+      localStorage.setItem(`${prefix}${k}`, '[]');
+      setDoc(doc(db, 'system_tenant_data', `${prefix}${k}`), {
+        tenantId: prefix.replace('_', ''),
+        key: k,
+        data: '[]',
+        updatedAt: Date.now()
+      }).catch(err => console.error(err));
+    });
 
     addLog('تسجيل معلم جديد', `تم إنشاء مساحة تخزين مشفرة وتفعيل رخصة لـ (${newTenant.name})`, 'success');
     showToast('success', `تم تسجيل المعلم وعزل قاعدة بياناته بنجاح!`);
@@ -605,9 +608,19 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       { id: 'f-2', studentId: 's-103', studentName: 'عمر هاشم المختار', className: 'مجموعة التميز - الصف الأول الثانوي', amount: 120, date: '2026-07-02', month: 'يوليو 2026', type: 'monthly_subscription', notes: 'دفع بالفيزا' }
     ];
 
-    localStorage.setItem(`${prefix}sams_v2_students`, JSON.stringify(mockStudents));
-    localStorage.setItem(`${prefix}sams_v2_classes`, JSON.stringify(mockClasses));
-    localStorage.setItem(`${prefix}sams_v2_fees`, JSON.stringify(mockFees));
+    const setFb = (k: string, v: any) => {
+      const s = JSON.stringify(v);
+      localStorage.setItem(`${prefix}${k}`, s);
+      setDoc(doc(db, 'system_tenant_data', `${prefix}${k}`), {
+        tenantId: prefix.replace('_', ''),
+        key: k,
+        data: s,
+        updatedAt: Date.now()
+      }).catch(err => console.error(err));
+    };
+    setFb('sams_v2_students', mockStudents);
+    setFb('sams_v2_classes', mockClasses);
+    setFb('sams_v2_fees', mockFees);
 
     scanDatabaseIsolation(tenants);
     addLog('تغذية بيانات تجريبية', `تم شحن قاعدة بيانات المعلم (${name}) ببيانات توضيحية كاملة لغرض العرض.`, 'success');

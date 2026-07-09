@@ -14,6 +14,7 @@ export interface Student {
   phone: string; // الهاتف
   parent_name: string; // ولي الأمر
   parent_phone: string; // هاتف ولي الأمر
+  barcode?: string; // باركود الطالب
   status: 'active' | 'suspended' | 'archived'; // نشط / معلق / مؤرشف
   photo_url?: string;
   notes?: string;
@@ -72,6 +73,9 @@ export interface Exam {
   date: string; // تاريخ الامتحان YYYY-MM-DD
   class_id: string; // المجموعة
   term: 'first_term' | 'second_term';
+  mode?: 'center' | 'online'; // مكان الامتحان
+  exam_url?: string; // رابط الامتحان الأونلاين
+  auto_attendance?: boolean; // ربط الامتحان بنظام الحضور
 }
 
 export interface Assignment {

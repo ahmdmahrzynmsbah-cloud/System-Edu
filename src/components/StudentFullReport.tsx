@@ -113,6 +113,7 @@ export default function StudentFullReport({ student, onClose }: Props) {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between items-center"><span className="text-slate-500">اسم الطالب</span><span className="font-bold text-slate-800">{student.name}</span></div>
                 <div className="flex justify-between items-center"><span className="text-slate-500">رقم القيد</span><span className="font-mono text-slate-700">{student.registration_id}</span></div>
+                {student.barcode && <div className="flex justify-between items-center"><span className="text-slate-500">باركود الطالب</span><span className="font-mono text-slate-700">{student.barcode}</span></div>}
                 <div className="flex justify-between items-center"><span className="text-slate-500">الرقم القومي</span><span className="font-mono text-slate-700">{student.national_id}</span></div>
                 <div className="flex justify-between items-center"><span className="text-slate-500">المجموعة</span><span className="font-bold text-[#1A7FAA]">{classInfo?.name || '-'}</span></div>
                 <div className="flex justify-between items-center"><span className="text-slate-500">السنة الدراسية</span><span className="font-bold text-slate-700">{student.grade_level}</span></div>

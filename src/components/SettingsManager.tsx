@@ -1,3 +1,5 @@
+import { saveToStorage } from "../utils/db";
+import { saveTenant } from '../lib/tenantsApi';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -77,20 +79,20 @@ export default function SettingsManager({
     try {
       const prefix = tenantId !== 'super-admin' && tenantId !== 'default' ? `${tenantId}_` : '';
 
-      localStorage.setItem(`${prefix}sams_custom_app_name_v2`, appName.trim());
-      localStorage.setItem(`${prefix}sams_custom_app_logo_v2`, appLogo.trim());
-      localStorage.setItem(`${prefix}sams_custom_header_title_v2`, headerTitle.trim());
-      localStorage.setItem(`${prefix}sams_custom_header_subtitle_v2`, headerSubtitle.trim());
+      saveToStorage('sams_custom_app_name_v2', appName.trim());
+      saveToStorage('sams_custom_app_logo_v2', appLogo.trim());
+      saveToStorage('sams_custom_header_title_v2', headerTitle.trim());
+      saveToStorage('sams_custom_header_subtitle_v2', headerSubtitle.trim());
 
-      localStorage.setItem(`${prefix}sams_msg_template_absence`, tAbsence.trim());
-      localStorage.setItem(`${prefix}sams_msg_template_excellent`, tExcellent.trim());
-      localStorage.setItem(`${prefix}sams_msg_template_fees`, tFees.trim());
-      localStorage.setItem(`${prefix}sams_msg_template_meeting`, tMeeting.trim());
+      saveToStorage('sams_msg_template_absence', tAbsence.trim());
+      saveToStorage('sams_msg_template_excellent', tExcellent.trim());
+      saveToStorage('sams_msg_template_fees', tFees.trim());
+      saveToStorage('sams_msg_template_meeting', tMeeting.trim());
 
-      localStorage.setItem(`${prefix}sams_callmebot_api_key`, callmebotKey.trim());
-      localStorage.setItem(`${prefix}sams_ultramsg_instance_id`, ultramsgId.trim());
-      localStorage.setItem(`${prefix}sams_ultramsg_token`, ultramsgToken.trim());
-      localStorage.setItem(`${prefix}sams_whatsapp_enabled`, whatsappEnabled ? 'true' : 'false');
+      saveToStorage('sams_callmebot_api_key', callmebotKey.trim());
+      saveToStorage('sams_ultramsg_instance_id', ultramsgId.trim());
+      saveToStorage('sams_ultramsg_token', ultramsgToken.trim());
+      saveToStorage('sams_whatsapp_enabled', whatsappEnabled ? 'true' : 'false');
 
       // Also update the appName in the main tenants list so Super Admin sees the new name in database size scan!
       if (tenantId !== 'super-admin' && tenantId !== 'default') {
@@ -98,13 +100,18 @@ export default function SettingsManager({
           const savedTenants = localStorage.getItem('sams_system_tenants');
           if (savedTenants) {
             const tenants = JSON.parse(savedTenants);
+            let updatedTenant = null;
             const updated = tenants.map((t: any) => {
               if (t.id === tenantId) {
-                return { ...t, appName: appName.trim() };
+                updatedTenant = { ...t, appName: appName.trim() };
+                return updatedTenant;
               }
               return t;
             });
             localStorage.setItem('sams_system_tenants', JSON.stringify(updated));
+            if (updatedTenant) {
+              saveTenant(updatedTenant).catch(console.error);
+            }
           }
         } catch (e) {}
       }
@@ -226,12 +233,36 @@ export default function SettingsManager({
                 <span className="text-[10px] text-slate-400 block">(الاسم المعروض أعلى الشريط اليمين والجانبي)</span>
               </div>
 
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">شعار السنتر (اللوجو):</label>
+                <div className="flex items-center gap-3">
+                  {appLogo && appLogo.length > 5 ? (
+                     <img src={appLogo} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white border border-gray-200" />
+                  ) : (
+                     <div className="w-10 h-10 rounded-lg bg-[#0D5C8C] flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm font-sans select-none">
+                       {appName ? appName.substring(0, 1) : 'ض'}
+                     </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">(اختر صورة مربعة لتعمل كشعار للسنتر)</span>
+              </div>
+
               <div className="space-y-1.5 col-span-1 md:col-span-2">
                 <label className="block text-xs font-bold text-slate-700">هوية وألوان المنصة المعتمدة:</label>
                 <div className="bg-emerald-50/70 border border-emerald-150 p-4 rounded-xl flex items-center gap-3 text-right">
-                  <div className="w-10 h-10 rounded-lg bg-[#0D5C8C] flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm font-sans select-none">
-                    ض
-                  </div>
+                  {appLogo && appLogo.length > 5 ? (
+                     <img src={appLogo} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white border border-gray-200" />
+                  ) : (
+                     <div className="w-10 h-10 rounded-lg bg-[#0D5C8C] flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm font-sans select-none">
+                       {appName ? appName.substring(0, 1) : 'ض'}
+                     </div>
+                  )}
                   <div>
                     <h4 className="text-xs font-bold text-slate-800 leading-none">شعار المنظومة مفعّل بنجاح</h4>
                     <p className="text-[11px] text-slate-500 mt-1">
@@ -269,7 +300,6 @@ export default function SettingsManager({
                       <motion.span 
                         layout 
                         className={`absolute top-1 w-4 h-4 rounded-full bg-indigo-600 transition-all shadow-sm ${isDarkMode ? 'right-1' : 'right-6'}`}
-                        animate={{ scale: [1, 1.15, 1] }}
                         transition={{ type: "spring", stiffness: 500, damping: 30 }}
                       />
                     </div>

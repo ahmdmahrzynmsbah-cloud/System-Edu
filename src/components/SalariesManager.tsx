@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, User, Plus, Search, Trash2, Calendar, FileText, CheckCircle } from 'lucide-react';
-import { addAuditLog } from '../utils/db';
+import { addAuditLog, saveToStorage } from '../utils/db';
 
 interface UserData {
   id: string;
@@ -76,7 +76,7 @@ export default function SalariesManager() {
 
     const updatedPayments = [newPayment, ...payments];
     setPayments(updatedPayments);
-    localStorage.setItem('sams_salaries', JSON.stringify(updatedPayments));
+    saveToStorage('sams_salaries', updatedPayments);
     
     addAuditLog('INSERT', 'salaries', newPayment.id, `صرف راتب بقيمة ${newPayment.amount} للسكرتيرة: ${newPayment.secretary_name}`);
     
@@ -89,7 +89,7 @@ export default function SalariesManager() {
     const paymentId = paymentToDelete.id;
     const updated = payments.filter(p => p.id !== paymentId);
     setPayments(updated);
-    localStorage.setItem('sams_salaries', JSON.stringify(updated));
+    saveToStorage('sams_salaries', updated);
     addAuditLog('DELETE', 'salaries', paymentId, `حذف سجل راتب بقيمة ${paymentToDelete.amount} للسكرتيرة: ${paymentToDelete.secretary_name}`);
     setPaymentToDelete(null);
   };

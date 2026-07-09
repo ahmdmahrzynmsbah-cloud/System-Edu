@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Student, ClassRoom, Attendance } from '../types';
+import { Student, ClassRoom, Attendance, FeePayment } from '../types';
 import { samsDb } from '../utils/db';
-import { CheckCheck, AlertCircle, Scan, UserCheck, Calendar, RotateCcw, Search, ShieldAlert, Wifi, Check, X, CheckCircle2, Trash2 } from 'lucide-react';
+import { CheckCheck, AlertCircle, CreditCard, Wallet, Scan, UserCheck, Calendar, RotateCcw, Search, ShieldAlert, Wifi, Check, X, CheckCircle2, Trash2 } from 'lucide-react';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 const playSuccessBeep = () => {
@@ -45,6 +46,13 @@ export default function AttendanceTracker() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassRoom[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [fees, setFees] = useState<FeePayment[]>([]);
+  const [unpaidStudentForBarcode, setUnpaidStudentForBarcode] = useState<Student | null>(null);
+  const [unpaidMonth, setUnpaidMonth] = useState<string>('');
+  const [absentWarningStudent, setAbsentWarningStudent] = useState<{student: Student, lastDate: string} | null>(null);
+  
+  const ARABIC_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
   
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -73,6 +81,7 @@ export default function AttendanceTracker() {
     setStudents(samsDb.getStudents().filter(s => s.status !== 'archived'));
     setClasses(samsDb.getClasses());
     setAttendance(samsDb.getAttendance());
+    setFees(samsDb.getFees());
   };
 
   useEffect(() => {
@@ -82,12 +91,37 @@ export default function AttendanceTracker() {
     return () => clearInterval(interval);
   }, []);
 
+
+  const processAttendance = (student: Student) => {
+    // Check if they were absent last session
+    const pastAttendance = attendance
+      .filter(a => a.student_id === student.id && a.date < selectedDate)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    if (pastAttendance.length > 0 && pastAttendance[0].status === 'absent') {
+        playErrorBuzzer();
+        setAbsentWarningStudent({ student, lastDate: pastAttendance[0].date });
+        return;
+    }
+
+    // Otherwise just save
+    samsDb.saveAttendance(student.id, student.class_id, selectedDate, 'present');
+    loadData();
+    playSuccessBeep();
+    setScanFeedback({ type: 'success', msg: `حضور: ${student.name}` });
+    setRecentScans(prev => [{
+      student,
+      timestamp: new Date().toLocaleTimeString('ar-EG'),
+      status: 'success'
+    }, ...prev].slice(0, 50));
+  };
+
   const handleBarcodeScan = (barcode: string) => {
     const cleanCode = barcode.trim();
     if (!cleanCode) return;
 
-    // Find student by registration_id
-    const student = students.find(s => s.registration_id === cleanCode || s.national_id === cleanCode);
+    // Find student by registration_id or barcode
+    const student = students.find(s => s.registration_id === cleanCode || s.national_id === cleanCode || s.barcode === cleanCode);
     
     if (!student) {
       playErrorBuzzer();
@@ -99,6 +133,17 @@ export default function AttendanceTracker() {
     // Use selectedDate for scanning, so you can scan for past days
     const targetDate = selectedDate;
     
+    const targetD = new Date(targetDate);
+    const targetMonthStr = `${ARABIC_MONTHS[targetD.getMonth()]} ${targetD.getFullYear()}`;
+    const studentPaid = samsDb.getFees().some(f => f.student_id === student.id && f.category === 'tuition' && f.month === targetMonthStr);
+    
+    if (!studentPaid) {
+        playErrorBuzzer();
+        setUnpaidStudentForBarcode(student);
+        setUnpaidMonth(targetMonthStr);
+        return;
+    }
+
     // Check if already present on target date
     const alreadyPresent = attendance.some(a => 
       a.student_id === student.id && 
@@ -118,17 +163,7 @@ export default function AttendanceTracker() {
       return;
     }
 
-    // Save attendance
-    samsDb.saveAttendance(student.id, student.class_id, targetDate, 'present');
-    loadData();
-    playSuccessBeep();
-    
-    setScanFeedback({ type: 'success', msg: `حضور: ${student.name}` });
-    setRecentScans(prev => [{
-      student,
-      timestamp: new Date().toLocaleTimeString('ar-EG'),
-      status: 'success'
-    }, ...prev].slice(0, 50));
+    processAttendance(student);
     
     setTimeout(() => setScanFeedback(null), 3000);
   };
@@ -144,6 +179,44 @@ export default function AttendanceTracker() {
       return matchesClass && matchesGrade;
     });
   }, [students, selectedClass, selectedGrade]);
+
+
+  const handleMarkPresent = (student: Student) => {
+    const targetD = new Date(selectedDate);
+    const monthStr = `${ARABIC_MONTHS[targetD.getMonth()]} ${targetD.getFullYear()}`;
+    const studentPaid = fees.some(f => f.student_id === student.id && f.category === 'tuition' && f.month === monthStr);
+    
+    if (!studentPaid) {
+        setUnpaidStudentForBarcode(student);
+        setUnpaidMonth(monthStr);
+    } else {
+        processAttendance(student);
+    }
+  };
+
+  const handleQuickPayFromBarcode = () => {
+    if (!unpaidStudentForBarcode) return;
+    const saved = localStorage.getItem('sams_grade_monthly_fees');
+    let defaultFees: Record<string, number> = {};
+    if (saved) {
+        try { defaultFees = JSON.parse(saved); } catch (e) {}
+    }
+    const amount = defaultFees[unpaidStudentForBarcode.grade_level] || 150;
+
+    samsDb.addPayment({
+        student_id: unpaidStudentForBarcode.id,
+        amount: amount,
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_method: 'cash',
+        term: 'full_year',
+        category: 'tuition',
+        month: unpaidMonth
+    });
+
+    const student = unpaidStudentForBarcode;
+    setUnpaidStudentForBarcode(null);
+    processAttendance(student);
+  };
 
   const markUnscannedAsAbsent = () => {
     setSuccessMsg('');
@@ -372,6 +445,7 @@ export default function AttendanceTracker() {
                   {selectedGrade === 'all' && <th className="px-4 py-3">الصف</th>}
                   {selectedClass === 'all' && <th className="px-4 py-3">المجموعة</th>}
                   <th className="px-4 py-3 text-center">حالة اليوم</th>
+                  <th className="px-4 py-3 text-center">الدفع</th>
                   <th className="px-4 py-3 text-center">إجراءات</th>
                 </tr>
               </thead>
@@ -397,9 +471,16 @@ export default function AttendanceTracker() {
                         {status === 'pending' && <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md text-xs font-bold">لم يُسجل</span>}
                       </td>
                       <td className="px-4 py-3 text-center">
+                        {fees.some(f => f.student_id === student.id && f.category === 'tuition' && f.month === `${ARABIC_MONTHS[new Date(selectedDate).getMonth()]} ${new Date(selectedDate).getFullYear()}`) ? (
+                            <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-xs font-bold"><Check className="w-3.5 h-3.5" /> مسدد</span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-xs font-bold"><X className="w-3.5 h-3.5" /> غير مسدد</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => { samsDb.saveAttendance(student.id, student.class_id, selectedDate, 'present'); loadData(); }}
+                            onClick={() => handleMarkPresent(student)}
                             className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${status === 'present' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
                             title="تعيين حاضر"
                           >
@@ -460,6 +541,133 @@ export default function AttendanceTracker() {
           </div>
         )}
       </AnimatePresence>
+
+            
+      {/* Absent Warning Modal */}
+      {createPortal(
+        <AnimatePresence>
+          {absentWarningStudent && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+              <motion.div 
+                  initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                  className="bg-white rounded-3xl shadow-2xl max-w-[340px] w-full p-6 text-center border-t-[5px] border-amber-500 relative overflow-hidden"
+                  dir="rtl"
+              >
+                  <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600"></div>
+                  <button 
+                      onClick={() => setAbsentWarningStudent(null)} 
+                      className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1.5 transition-colors"
+                  >
+                      <X className="w-4 h-4" />
+                  </button>
+                  
+                  <div className="w-14 h-14 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner shadow-amber-100">
+                      <AlertCircle className="w-7 h-7" />
+                  </div>
+                  
+                  <h3 className="font-extrabold text-lg text-slate-800 mb-1 tracking-tight">تنبيه غياب سابق!</h3>
+                  <p className="text-xs text-slate-500 mb-4">الطالب كان غائباً في الحصة السابقة</p>
+                  
+                  <div className="bg-gradient-to-b from-slate-50 to-white p-3.5 rounded-2xl border border-slate-100 text-center mb-5 shadow-sm">
+                      <p className="font-bold text-slate-800 text-sm mb-0.5 truncate">{absentWarningStudent.student.name}</p>
+                      <p className="text-xs text-slate-400 mb-2 font-mono tracking-wider">{absentWarningStudent.student.registration_id}</p>
+                      <div className="inline-flex items-center justify-center gap-1.5 bg-amber-50 border border-amber-100/50 px-3 py-1.5 rounded-lg w-full">
+                          <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                          <span className="text-amber-700 font-bold text-xs">تاريخ الغياب: {absentWarningStudent.lastDate}</span>
+                      </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2.5">
+                      <button 
+                          onClick={() => {
+                              samsDb.saveAttendance(absentWarningStudent.student.id, absentWarningStudent.student.class_id, selectedDate, 'present');
+                              setAbsentWarningStudent(null);
+                              loadData();
+                              playSuccessBeep();
+                              setScanFeedback({ type: 'success', msg: `حضور: ${absentWarningStudent.student.name}` });
+                              setRecentScans(prev => [{
+                                student: absentWarningStudent.student,
+                                timestamp: new Date().toLocaleTimeString('ar-EG'),
+                                status: 'success'
+                              }, ...prev].slice(0, 50));
+                          }}
+                          className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-200 transition-all flex items-center justify-center gap-2 text-sm group"
+                      >
+                          <CheckCircle2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          حسناً، تسجيل الحضور
+                      </button>
+                  </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Unpaid Payment Modal */}
+      {createPortal(
+        <AnimatePresence>
+          {unpaidStudentForBarcode && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+              <motion.div 
+                  initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                  className="bg-white rounded-3xl shadow-2xl max-w-[340px] w-full p-6 text-center border-t-[5px] border-rose-500 relative overflow-hidden"
+                  dir="rtl"
+              >
+                  <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-rose-400 via-rose-500 to-rose-600"></div>
+                  <button 
+                      onClick={() => setUnpaidStudentForBarcode(null)} 
+                      className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-1.5 transition-colors"
+                  >
+                      <X className="w-4 h-4" />
+                  </button>
+                  
+                  <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner shadow-rose-100">
+                      <Wallet className="w-7 h-7" />
+                  </div>
+                  
+                  <h3 className="font-extrabold text-lg text-slate-800 mb-1 tracking-tight">تنبيه تأخير السداد!</h3>
+                  <p className="text-xs text-slate-500 mb-4">يجب سداد الاشتراك لتسجيل الحضور</p>
+                  
+                  <div className="bg-gradient-to-b from-slate-50 to-white p-3.5 rounded-2xl border border-slate-100 text-center mb-5 shadow-sm">
+                      <p className="font-bold text-slate-800 text-sm mb-0.5 truncate">{unpaidStudentForBarcode.name}</p>
+                      <p className="text-xs text-slate-400 mb-2 font-mono tracking-wider">{unpaidStudentForBarcode.registration_id}</p>
+                      <div className="inline-flex items-center justify-center gap-1.5 bg-rose-50 border border-rose-100/50 px-3 py-1.5 rounded-lg w-full">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                          <span className="text-rose-600 font-bold text-xs">متأخر عن: {unpaidMonth}</span>
+                      </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2.5">
+                      <button 
+                          onClick={handleQuickPayFromBarcode}
+                          className="w-full py-2.5 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-bold rounded-xl shadow-md shadow-rose-200 transition-all flex items-center justify-center gap-2 text-sm group"
+                      >
+                          <CreditCard className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          سداد وتسجيل الحضور
+                      </button>
+                      <button 
+                          onClick={() => {
+                              const student = unpaidStudentForBarcode;
+                              setUnpaidStudentForBarcode(null);
+                              processAttendance(student);
+                          }} 
+                          className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-700 font-bold rounded-xl transition-colors flex items-center justify-center gap-2 text-sm border border-transparent hover:border-slate-200"
+                      >
+                          <UserCheck className="w-4 h-4" />
+                          تجاوز الحضور فقط
+                      </button>
+                  </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
