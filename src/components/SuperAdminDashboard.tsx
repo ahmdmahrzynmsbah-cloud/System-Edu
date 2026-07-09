@@ -292,8 +292,6 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       setLogs(defaultLogs);
     }
 
-    // Dynamic database scanning
-    scanDatabaseIsolation(loadedTenants);
     return () => { if (unsubscribe) unsubscribe(); }
   }, []);
 

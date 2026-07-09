@@ -144,7 +144,13 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         (!finalName || u.name.toLowerCase().includes(finalName.toLowerCase()))
       );
       if (found) {
-        localStorage.setItem('sams_current_tenant_id', found.tenantId || 'default');
+        const secTenantId = found.tenantId || 'default';
+        const secTenant = tenants.find(t => t.id === secTenantId);
+        if (secTenant && secTenant.status === 'suspended') {
+            setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
+            return;
+        }
+        localStorage.setItem('sams_current_tenant_id', secTenantId);
         onLoginSuccess('teacher', found.name, found.id);
         return;
       }
@@ -168,6 +174,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       }
 
       if (matchedSec) {
+        const secTenant = tenants.find(t => t.id === secTenantId);
+        if (secTenant && secTenant.status === 'suspended') {
+            setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
+            return;
+        }
         localStorage.setItem('sams_current_tenant_id', secTenantId);
         onLoginSuccess('secretary', matchedSec.name, matchedSec.id);
         return;
@@ -179,7 +190,13 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                         users.find(u => u.role === role && u.password === trimmedPassword);
     
     if (matchedUser) {
-      localStorage.setItem('sams_current_tenant_id', 'default');
+      const secTenantId = matchedUser.tenantId || 'default';
+      const secTenant = tenants.find(t => t.id === secTenantId);
+      if (secTenant && secTenant.status === 'suspended') {
+          setError('تم إيقاف هذا الحساب مؤقتاً من قبل الإدارة العامة. يرجى مراجعة الدعم الفني لتفعيل الاشتراك.');
+          return;
+      }
+      localStorage.setItem('sams_current_tenant_id', secTenantId);
       onLoginSuccess(role, finalName || matchedUser.name, matchedUser.id);
     } else {
       setError('رمز الدخول غير صحيح!');

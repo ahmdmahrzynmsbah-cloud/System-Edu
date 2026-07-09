@@ -4,6 +4,7 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot } from 
 export interface Tenant {
   id: string;
   name: string;
+  phone?: string;
   password?: string;
   joinedDate: string;
   expiryDate?: string;
@@ -12,6 +13,8 @@ export interface Tenant {
   whatsappGatewayEnabled?: boolean;
   status: 'active' | 'suspended';
   appName?: string;
+  features?: string[];
+  pricePaid?: number;
 }
 
 export const getAllTenants = async (): Promise<Tenant[]> => {
