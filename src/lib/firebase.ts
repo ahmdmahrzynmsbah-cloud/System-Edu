@@ -1,0 +1,16 @@
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+  projectId: "gen-lang-client-0140690955",
+  appId: "1:999074803244:web:f33dd3e72442216c896b89",
+  apiKey: "AIzaSyC2eijCPOBU2DwDcOSSoGFMeQd6ttPsevQ",
+  authDomain: "gen-lang-client-0140690955.firebaseapp.com",
+  storageBucket: "gen-lang-client-0140690955.firebasestorage.app",
+  messagingSenderId: "999074803244",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, "ai-studio-fox-e3dc92be-ad86-43f2-a091-f5d4f37b7d15");
+
+export { db };

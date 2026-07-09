@@ -12,6 +12,9 @@ export default defineConfig(() => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
+        workbox: {
+          maximumFileSizeToCacheInBytes: 4000000
+        },
         manifest: {
           name: 'Fox System لادارة السناتر التعليمية',
           short_name: 'FOX System',

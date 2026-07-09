@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Key, User, Plus, Check, X, Trash2, Edit2, Lock } from 'lucide-react';
+import { getSystemUsersByTenant, saveSystemUser, deleteSystemUser, subscribeToSystemUsers } from '../lib/usersApi';
 
 interface SystemUser {
   id: string;
@@ -84,11 +85,8 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
     }
   };
 
-  const saveUsers = (newUsers: SystemUser[]) => {
-    setUsers(newUsers);
-    localStorage.setItem('sams_system_users', JSON.stringify(newUsers));
-    const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
-    localStorage.setItem(`${tenantId}_sams_system_users`, JSON.stringify(newUsers));
+  const saveUsers = async (newUsers: SystemUser[]) => {
+    // Handled individually in submit
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -97,9 +95,12 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
     setErrorMsg('');
 
     if (editingId) {
-      const updated = users.map(u => u.id === editingId ? { ...u, name: formData.name!, password: formData.password!, role: formData.role!, permissions: formData.permissions || [] } as SystemUser : u);
-      saveUsers(updated);
-      setSuccessMsg('تم تعديل بيانات المستخدم بنجاح');
+      const updatedUser = { ...users.find(u => u.id === editingId), name: formData.name!, password: formData.password!, role: formData.role!, permissions: formData.permissions || [] } as SystemUser;
+      saveSystemUser(updatedUser).then(() => {
+        setSuccessMsg('تم تعديل بيانات المستخدم بنجاح');
+      }).catch(err => {
+        setErrorMsg('حدث خطأ أثناء الحفظ');
+      });
     } else {
       // Limit verification for adding a new secretary
       const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';

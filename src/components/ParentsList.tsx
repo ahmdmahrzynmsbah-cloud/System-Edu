@@ -456,6 +456,19 @@ export default function ParentsList() {
                           >
                             <MessageSquare className="w-4 h-4" />
                           </a>
+                          <a
+                            href={parent.parent_phone ? `https://t.me/+${parent.parent_phone.startsWith('0') ? '2' + parent.parent_phone : parent.parent_phone}` : '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="مراسلة سريعة عبر تيليجرام"
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              parent.parent_phone 
+                                ? 'text-sky-600 hover:bg-sky-50 hover:text-sky-700' 
+                                : 'text-slate-300 pointer-events-none'
+                            }`}
+                          >
+                            <Send className="w-4 h-4 -ml-0.5" />
+                          </a>
                         </td>
                       </motion.tr>
                     );
