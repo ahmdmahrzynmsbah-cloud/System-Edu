@@ -48,6 +48,7 @@ export default function SettingsManager({
   const [ultramsgId, setUltramsgId] = useState(() => getTenantSetting('sams_ultramsg_instance_id', ''));
   const [ultramsgToken, setUltramsgToken] = useState(() => getTenantSetting('sams_ultramsg_token', ''));
   const [whatsappEnabled, setWhatsappEnabled] = useState(() => getTenantSetting('sams_whatsapp_enabled', 'true') !== 'false');
+  const [autoAbsenceAlert, setAutoAbsenceAlert] = useState(() => getTenantSetting('sams_auto_absence_alert', 'true') !== 'false');
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -93,6 +94,7 @@ export default function SettingsManager({
       saveToStorage('sams_ultramsg_instance_id', ultramsgId.trim());
       saveToStorage('sams_ultramsg_token', ultramsgToken.trim());
       saveToStorage('sams_whatsapp_enabled', whatsappEnabled ? 'true' : 'false');
+      saveToStorage('sams_auto_absence_alert', autoAbsenceAlert ? 'true' : 'false');
 
       // Also update the appName in the main tenants list so Super Admin sees the new name in database size scan!
       if (tenantId !== 'super-admin' && tenantId !== 'default') {
@@ -500,6 +502,32 @@ export default function SettingsManager({
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* ROW 4: Automated Alerts */}
+        <div className={`bg-white rounded-2xl border ${autoAbsenceAlert ? 'border-gray-100' : 'border-gray-200'} shadow-2xs overflow-hidden transition-colors`}>
+          <div className="p-5 border-b border-gray-50 bg-slate-50/50 flex items-center justify-between text-right">
+            <div className="flex items-center gap-2">
+              <span className="w-4.5 h-4.5 text-[#0D5C8C]">🔔</span>
+              <h3 className="font-bold text-xs text-slate-800">4. التنبيهات التلقائية والتنبؤية (Automated Alerts)</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-bold ${autoAbsenceAlert ? 'text-emerald-600' : 'text-slate-500'}`}>{autoAbsenceAlert ? 'مفعل' : 'معطل'}</span>
+              <button 
+                type="button"
+                onClick={() => setAutoAbsenceAlert(!autoAbsenceAlert)}
+                className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer focus:outline-hidden ${autoAbsenceAlert ? 'bg-emerald-500' : 'bg-slate-300'}`}
+              >
+                <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${autoAbsenceAlert ? 'left-1' : 'left-6'}`} />
+              </button>
+            </div>
+          </div>
+          
+          <div className={`p-5 space-y-4 text-right transition-opacity ${!autoAbsenceAlert ? 'opacity-40 pointer-events-none' : ''}`}>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              عند تفعيل هذا الخيار، سيقوم السيستم تلقائياً برصد غياب الطالب لمرتين متتاليتين في نفس المجموعة، وإرسال تنبيه آلي لولي الأمر (كإشعار محاكاة عبر السيستم) لتحذيره من تكرار الغياب.
+            </p>
           </div>
         </div>
 

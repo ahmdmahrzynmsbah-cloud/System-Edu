@@ -520,6 +520,36 @@ export const samsDb = {
       }
     }
 
+    // Automated Absence Alert Rule (2 consecutive absences)
+    const autoAlertEnabled = getTenantSetting('sams_auto_absence_alert', 'true') !== 'false';
+    if (status === 'absent' && autoAlertEnabled && studentObj) {
+      const studentAttendances = list
+        .filter(a => a.student_id === student_id && a.class_id === class_id && a.date <= date)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      // Ensure there are at least two records and they are both absent
+      if (studentAttendances.length >= 2) {
+        const latest = studentAttendances[0];
+        const previous = studentAttendances[1];
+        // Only trigger if this save operation is for the latest date (to prevent backdating triggers)
+        if (latest.date === date && latest.status === 'absent' && previous.status === 'absent') {
+          // Simulate automated parent alert
+          this.addNotification({
+            title: `تنبيه تلقائي (غياب متكرر): ${studentName}`,
+            message: `عزيزي ولي الأمر (${studentObj.parent_name})، يرجى الانتباه أن الطالب/ة (${studentName}) تغيب لمرتين متتاليتين (بتاريخ ${previous.date} و ${latest.date}). يرجى التواصل مع الإدارة.`,
+            category: 'sms',
+            recipient_type: 'specific',
+            recipient_id: student_id
+          });
+          
+          this.addAdminNotification({
+            type: 'system',
+            message: `تم إرسال تحذير غياب متتالي تلقائياً لولي أمر الطالب (${studentName}).`,
+          });
+        }
+      }
+    }
+
     return result;
   },
 
