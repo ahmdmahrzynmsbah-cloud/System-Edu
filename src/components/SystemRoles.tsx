@@ -77,10 +77,21 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
       if (dbUsers.length > 0) {
         setUsers(dbUsers);
       } else {
-        const defaultUsers: SystemUser[] = [
-          { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true, tenantId: localStorage.getItem('sams_current_tenant_id') || 'default' },
-          { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true, tenantId: localStorage.getItem('sams_current_tenant_id') || 'default' }
-        ];
+        // Fallback to local storage migration
+        const saved = localStorage.getItem(`${currentTenantId}_sams_system_users`) || localStorage.getItem('sams_system_users');
+        let defaultUsers: SystemUser[] = [];
+        if (saved) {
+           defaultUsers = JSON.parse(saved);
+        } else {
+           defaultUsers = [
+            { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true, tenantId: currentTenantId },
+            { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true, tenantId: currentTenantId }
+          ];
+        }
+        
+        // Ensure tenantId is set for all migrated users
+        defaultUsers = defaultUsers.map(u => ({...u, tenantId: currentTenantId}));
+        
         setUsers(defaultUsers);
         // Save defaults to Firebase
         await Promise.all(defaultUsers.map(u => saveSystemUser(u)));
@@ -103,6 +114,7 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
       const updatedUser = { ...users.find(u => u.id === editingId), name: formData.name!, password: formData.password!, role: formData.role!, permissions: formData.permissions || [] } as SystemUser;
       saveSystemUser(updatedUser).then(() => {
         setSuccessMsg('تم تعديل بيانات المستخدم بنجاح');
+        setUsers(users.map(u => u.id === editingId ? updatedUser : u));
       }).catch(err => {
         setErrorMsg('حدث خطأ أثناء الحفظ');
       });
@@ -138,6 +150,7 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
       };
       saveSystemUser(newUser).then(() => {
         setSuccessMsg(formData.role === 'teacher' ? 'تم إضافة مدرس بنجاح' : 'تم إضافة سكرتيرة جديدة بنجاح');
+        setUsers([...users, newUser]);
       }).catch(err => {
         setErrorMsg('حدث خطأ أثناء الإضافة');
       });
@@ -156,6 +169,7 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
     if (userToDelete) {
       deleteSystemUser(userToDelete).then(() => {
         setSuccessMsg('تم حذف المستخدم بنجاح');
+        setUsers(users.filter(u => u.id !== userToDelete));
         setUserToDelete(null);
       }).catch(err => {
         setErrorMsg('حدث خطأ أثناء الحذف');

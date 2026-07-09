@@ -1,5 +1,5 @@
-import { getAllTenants } from "../lib/tenantsApi";
-import { getAllSystemUsers } from "../lib/usersApi";
+import { getAllTenants, saveTenant } from "../lib/tenantsApi";
+import { getAllSystemUsers, saveSystemUser } from "../lib/usersApi";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -31,8 +31,17 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     const loadUsers = async () => {
       try {
         const dbTenants = await getAllTenants();
-        setTenants(dbTenants);
-        localStorage.setItem('sams_system_tenants', JSON.stringify(dbTenants));
+        if (dbTenants.length > 0) {
+          setTenants(dbTenants);
+          localStorage.setItem('sams_system_tenants', JSON.stringify(dbTenants));
+        } else {
+          const saved = localStorage.getItem('sams_system_tenants');
+          if (saved) {
+             const parsed = JSON.parse(saved);
+             setTenants(parsed);
+             await Promise.all(parsed.map((t: any) => saveTenant(t)));
+          }
+        }
       } catch (err) {
         const saved = localStorage.getItem('sams_system_tenants');
         if (saved) setTenants(JSON.parse(saved));
@@ -42,10 +51,18 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         if (dbUsers.length > 0) {
           setUsers(dbUsers);
         } else {
-          setUsers([
-            { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true, tenantId: 'default' },
-            { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true, tenantId: 'default' }
-          ]);
+          const saved = localStorage.getItem('sams_system_users');
+          let parsed: any[] = [];
+          if (saved) {
+            parsed = JSON.parse(saved);
+          } else {
+            parsed = [
+              { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true, tenantId: 'default' },
+              { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true, tenantId: 'default' }
+            ];
+          }
+          setUsers(parsed);
+          await Promise.all(parsed.map(u => saveSystemUser(u)));
         }
       } catch (err) {
         // Fallback

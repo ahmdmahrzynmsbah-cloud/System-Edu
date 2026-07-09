@@ -219,47 +219,53 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
   // Load and seed tenants and log on mount
   useEffect(() => {
     // 1. Tenants Load
-    const savedTenants = localStorage.getItem('sams_system_tenants');
-    let loadedTenants: Tenant[] = [];
-    if (savedTenants) {
-      loadedTenants = JSON.parse(savedTenants);
-    } else {
-      // Seed default teachers
-      loadedTenants = [
-        {
-          id: 'tenant-1',
-          name: 'الأستاذ أحمد كمال',
-          phone: '01012345678',
-          password: '123',
-          status: 'active',
-          joinedDate: '2026-06-01',
-          expiryDate: '2026-12-31',
-          appName: 'أكاديمية أحمد كمال للغة العربية',
-          features: ['dashboard', 'students', 'classes', 'attendance', 'exams', 'fees', 'notifications', 'settings'],
-          pricePaid: 1500,
-          maxStudents: 100,
-          maxSecretaries: 3,
-          whatsappGatewayEnabled: true
-        },
-        {
-          id: 'tenant-2',
-          name: 'الأستاذ بهاء الدين',
-          phone: '01122233344',
-          password: '456',
-          status: 'suspended',
-          joinedDate: '2026-06-15',
-          expiryDate: '2026-07-01',
-          appName: 'سيستم بهاء الدين التعليمي',
-          features: ['dashboard', 'students', 'attendance', 'exams'],
-          pricePaid: 800,
-          maxStudents: 50,
-          maxSecretaries: 2,
-          whatsappGatewayEnabled: false
+    const loadData = async () => {
+      try {
+        const dbTenants = await getAllTenants();
+        if (dbTenants.length > 0) {
+          setTenants(dbTenants);
+          scanDatabaseIsolation(dbTenants);
+        } else {
+          // Check local storage first
+          const savedTenants = localStorage.getItem('sams_system_tenants');
+          let loadedTenants: Tenant[] = [];
+          if (savedTenants) {
+             loadedTenants = JSON.parse(savedTenants);
+          } else {
+            loadedTenants = [
+              {
+                id: 'tenant-1',
+                name: 'الأستاذ أحمد كمال',
+                phone: '01012345678',
+                password: '123',
+                status: 'active',
+                joinedDate: '2026-06-01',
+                expiryDate: '2026-12-31',
+                appName: 'أكاديمية أحمد كمال للغة العربية',
+                features: ['dashboard', 'students', 'classes', 'attendance', 'exams', 'fees', 'notifications', 'settings'],
+                pricePaid: 1500,
+                maxStudents: 100,
+                maxSecretaries: 3,
+                whatsappGatewayEnabled: true
+              }
+            ];
+          }
+          setTenants(loadedTenants);
+          scanDatabaseIsolation(loadedTenants);
+          await Promise.all(loadedTenants.map(t => saveTenant(t)));
         }
-      ];
-      localStorage.setItem('sams_system_tenants', JSON.stringify(loadedTenants));
-    }
-    setTenants(loadedTenants);
+      } catch (err) {
+        console.error("Failed to load tenants:", err);
+      }
+    };
+    loadData();
+
+    const unsubscribe = subscribeToTenants((updatedList) => {
+      if (updatedList.length > 0) {
+        setTenants(updatedList);
+        scanDatabaseIsolation(updatedList);
+      }
+    });
 
     // 2. Logs Load
     const savedLogs = localStorage.getItem('sams_super_admin_audit_logs');
@@ -288,6 +294,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
 
     // Dynamic database scanning
     scanDatabaseIsolation(loadedTenants);
+    return () => { if (unsubscribe) unsubscribe(); }
   }, []);
 
   // Scan localStorage to calculate actual size and record count for each teacher
@@ -416,6 +423,12 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
 
     saveTenant(newTenant).then(() => {
       setShowAddModal(false);
+      const updated = [...tenants, newTenant];
+      setTenants(updated);
+      localStorage.setItem('sams_system_tenants', JSON.stringify(updated));
+    }).catch(err => {
+      console.error(err);
+      alert('حدث خطأ أثناء الحفظ في قاعدة البيانات. يرجى المحاولة مرة أخرى.');
     });
     
     // Seed blank structures for this new tenant
@@ -486,8 +499,12 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       saveTenant(updatedTenant).then(() => {
         setShowEditModal(false);
         setSelectedTenant(null);
+        setTenants(updated);
+        localStorage.setItem('sams_system_tenants', JSON.stringify(updated));
         addLog('تعديل ترخيص', `تم تحديث رخصة ومميزات المعلم (${formData.name})`, 'info');
         showToast('success', `تم حفظ وتعديل التراخيص بنجاح!`);
+      }).catch(err => {
+        alert('حدث خطأ أثناء التعديل.');
       });
     }
   };
@@ -522,7 +539,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       return t;
     });
     saveTenant({ ...tenant, status: nextStatus }).then(() => {
-      // success
+      setTenants(updated);
+      localStorage.setItem('sams_system_tenants', JSON.stringify(updated));
     });
     
     addLog(
