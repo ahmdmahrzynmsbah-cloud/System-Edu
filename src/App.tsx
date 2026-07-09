@@ -57,6 +57,7 @@ import { Bell, CheckCheck, Trash2, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { samsDb, getTenantSetting } from './utils/db';
+import { subscribeToTenants } from './lib/tenantsApi';
 
 type TabType = 'dashboard' | 'students' | 'parents' | 'barcodes' | 'classes' | 'attendance' | 'fees' | 'notifications' | 'roles' | 'audit' | 'settings' | 'exams' | 'salaries' | 'privacy' | 'books';
 

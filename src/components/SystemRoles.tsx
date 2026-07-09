@@ -9,6 +9,7 @@ interface SystemUser {
   password: string;
   isDefault?: boolean;
   permissions?: string[];
+  tenantId?: string;
 }
 
 interface SystemRolesProps {
@@ -69,19 +70,23 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
     }
   }, [errorMsg]);
 
-  const loadUsers = () => {
-    const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
-    const saved = localStorage.getItem(`${tenantId}_sams_system_users`) || localStorage.getItem('sams_system_users');
-    if (saved) {
-      setUsers(JSON.parse(saved));
-    } else {
-      const defaultUsers: SystemUser[] = [
-        { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true },
-        { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true }
-      ];
-      setUsers(defaultUsers);
-      localStorage.setItem('sams_system_users', JSON.stringify(defaultUsers));
-      localStorage.setItem(`${tenantId}_sams_system_users`, JSON.stringify(defaultUsers));
+  const loadUsers = async () => {
+    const currentTenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
+    try {
+      const dbUsers = await getSystemUsersByTenant(currentTenantId);
+      if (dbUsers.length > 0) {
+        setUsers(dbUsers);
+      } else {
+        const defaultUsers: SystemUser[] = [
+          { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true, tenantId: localStorage.getItem('sams_current_tenant_id') || 'default' },
+          { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true, tenantId: localStorage.getItem('sams_current_tenant_id') || 'default' }
+        ];
+        setUsers(defaultUsers);
+        // Save defaults to Firebase
+        await Promise.all(defaultUsers.map(u => saveSystemUser(u)));
+      }
+    } catch (err) {
+      console.error('Failed to load users from Firebase:', err);
     }
   };
 
@@ -103,13 +108,13 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
       });
     } else {
       // Limit verification for adding a new secretary
-      const tenantId = localStorage.getItem('sams_current_tenant_id') || 'default';
-      if (tenantId !== 'super-admin' && tenantId !== 'default' && formData.role === 'secretary') {
+      
+      if (localStorage.getItem('sams_current_tenant_id') !== 'super-admin' && localStorage.getItem('sams_current_tenant_id') !== 'default' && formData.role === 'secretary') {
         try {
           const savedTenants = localStorage.getItem('sams_system_tenants');
           if (savedTenants) {
             const tenants = JSON.parse(savedTenants);
-            const currentTenant = tenants.find((t: any) => t.id === tenantId);
+            const currentTenant = tenants.find((t: any) => t.id === localStorage.getItem('sams_current_tenant_id'));
             if (currentTenant) {
               const maxSecretaries = currentTenant.maxSecretaries || 3;
               const currentSecretaries = users.filter(u => u.role === 'secretary').length;
@@ -122,15 +127,20 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
         } catch (err) {}
       }
 
+      
       const newUser: SystemUser = {
         id: 'u-' + Date.now(),
         name: formData.name,
         role: formData.role as 'teacher' | 'secretary',
         permissions: formData.permissions || [],
-        password: formData.password
+        password: formData.password,
+        tenantId: localStorage.getItem('sams_current_tenant_id') || 'default'
       };
-      saveUsers([...users, newUser]);
-      setSuccessMsg('تم إضافة سكرتيرة جديدة بنجاح');
+      saveSystemUser(newUser).then(() => {
+        setSuccessMsg(formData.role === 'teacher' ? 'تم إضافة مدرس بنجاح' : 'تم إضافة سكرتيرة جديدة بنجاح');
+      }).catch(err => {
+        setErrorMsg('حدث خطأ أثناء الإضافة');
+      });
     }
     
     setShowAddForm(false);
@@ -144,9 +154,13 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
 
   const handleDelete = () => {
     if (userToDelete) {
-      saveUsers(users.filter(u => u.id !== userToDelete));
-      setSuccessMsg('تم حذف المستخدم بنجاح');
-      setUserToDelete(null);
+      deleteSystemUser(userToDelete).then(() => {
+        setSuccessMsg('تم حذف المستخدم بنجاح');
+        setUserToDelete(null);
+      }).catch(err => {
+        setErrorMsg('حدث خطأ أثناء الحذف');
+        setUserToDelete(null);
+      });
     }
   };
 

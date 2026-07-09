@@ -1,3 +1,4 @@
+import { getAllTenants, saveTenant, deleteTenant, subscribeToTenants } from "../lib/tenantsApi";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -413,9 +414,9 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       whatsappGatewayEnabled: formData.whatsappGatewayEnabled
     };
 
-    const updated = [...tenants, newTenant];
-    saveTenantsToStorage(updated);
-    setShowAddModal(false);
+    saveTenant(newTenant).then(() => {
+      setShowAddModal(false);
+    });
     
     // Seed blank structures for this new tenant
     const prefix = `${newTenant.id}_`;
@@ -480,12 +481,15 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       return t;
     });
 
-    saveTenantsToStorage(updated);
-    setShowEditModal(false);
-    setSelectedTenant(null);
-
-    addLog('تعديل ترخيص', `تم تحديث رخصة ومميزات المعلم (${formData.name})`, 'info');
-    showToast('success', `تم حفظ وتعديل التراخيص بنجاح!`);
+    const updatedTenant = updated.find(t => t.id === selectedTenant!.id);
+    if (updatedTenant) {
+      saveTenant(updatedTenant).then(() => {
+        setShowEditModal(false);
+        setSelectedTenant(null);
+        addLog('تعديل ترخيص', `تم تحديث رخصة ومميزات المعلم (${formData.name})`, 'info');
+        showToast('success', `تم حفظ وتعديل التراخيص بنجاح!`);
+      });
+    }
   };
 
   const handleDeleteTenant = (id: string, name: string) => {
@@ -517,7 +521,9 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       }
       return t;
     });
-    saveTenantsToStorage(updated);
+    saveTenant({ ...tenant, status: nextStatus }).then(() => {
+      // success
+    });
     
     addLog(
       nextStatus === 'active' ? 'تنشيط رخصة' : 'إيقاف رخصة', 

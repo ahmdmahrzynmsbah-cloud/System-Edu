@@ -1,3 +1,5 @@
+import { getAllTenants } from "../lib/tenantsApi";
+import { getAllSystemUsers } from "../lib/usersApi";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -23,17 +25,39 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   
   
   const [users, setUsers] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
 
   useEffect(() => {
-    const loadUsers = () => {
-      const saved = localStorage.getItem('sams_system_users');
-      if (saved) {
-        setUsers(JSON.parse(saved));
-      } else {
-        setUsers([
-          { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true },
-          { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true }
-        ]);
+    const loadUsers = async () => {
+      try {
+        const dbTenants = await getAllTenants();
+        setTenants(dbTenants);
+        localStorage.setItem('sams_system_tenants', JSON.stringify(dbTenants));
+      } catch (err) {
+        const saved = localStorage.getItem('sams_system_tenants');
+        if (saved) setTenants(JSON.parse(saved));
+      }
+      try {
+        const dbUsers = await getAllSystemUsers();
+        if (dbUsers.length > 0) {
+          setUsers(dbUsers);
+        } else {
+          setUsers([
+            { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true, tenantId: 'default' },
+            { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true, tenantId: 'default' }
+          ]);
+        }
+      } catch (err) {
+        // Fallback
+        const saved = localStorage.getItem('sams_system_users');
+        if (saved) {
+          setUsers(JSON.parse(saved));
+        } else {
+          setUsers([
+            { id: 'u-1', name: 'المدير الأكاديمي', role: 'teacher', password: '123', isDefault: true },
+            { id: 'u-2', name: 'أ. سارة علي', role: 'secretary', password: '456', isDefault: true }
+          ]);
+        }
       }
     };
     loadUsers();
@@ -58,12 +82,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       return;
     }
 
-    // Load tenants list
-    let tenants: any[] = [];
-    try {
-      const saved = localStorage.getItem('sams_system_tenants');
-      if (saved) tenants = JSON.parse(saved);
-    } catch (e) {}
+    // Tenants are already loaded in state `tenants`
 
     // 2. Check Teacher role against Tenants
     if (role === 'teacher') {
@@ -100,28 +119,35 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       }
     }
 
-    // 3. Check Secretary or sub-user across all Tenant databases
+    // 2b. Check Teacher role against Firebase users (created from SystemRoles)
+    if (role === 'teacher') {
+      const found = users.find((u: any) => 
+        u.role === 'teacher' && 
+        u.password === trimmedPassword &&
+        (!finalName || u.name.toLowerCase().includes(finalName.toLowerCase()))
+      );
+      if (found) {
+        localStorage.setItem('sams_current_tenant_id', found.tenantId || 'default');
+        onLoginSuccess('teacher', found.name, found.id);
+        return;
+      }
+    }
+
+
+    // 3. Check Secretary across all Firebase users
     if (role === 'secretary') {
       let matchedSec: any = null;
       let secTenantId = '';
-      
-      for (const tenant of tenants) {
-        try {
-          const tenantUsersRaw = localStorage.getItem(`${tenant.id}_sams_system_users`);
-          if (tenantUsersRaw) {
-            const tenantUsers = JSON.parse(tenantUsersRaw);
-            const found = tenantUsers.find((u: any) => 
-              u.role === 'secretary' && 
-              u.password === trimmedPassword &&
-              (!finalName || u.name.toLowerCase().includes(finalName.toLowerCase()))
-            );
-            if (found) {
-              matchedSec = found;
-              secTenantId = tenant.id;
-              break;
-            }
-          }
-        } catch (e) {}
+
+      const found = users.find((u: any) => 
+        u.role === 'secretary' && 
+        u.password === trimmedPassword &&
+        (!finalName || u.name.toLowerCase().includes(finalName.toLowerCase()))
+      );
+
+      if (found) {
+        matchedSec = found;
+        secTenantId = found.tenantId || 'default';
       }
 
       if (matchedSec) {
