@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { samsDb } from '../utils/db';
 import { Student, ClassRoom } from '../types';
-import { Search, Plus, Filter, Edit, Trash2, ShieldAlert, CheckCircle, Eye, X, BookOpen, CreditCard, Calendar, Phone, User, Users } from 'lucide-react';
+import { Search, Plus, Filter, Edit, Trash2, ShieldAlert, CheckCircle, Eye, X, BookOpen, CreditCard, Calendar, Phone, User, Users, ArrowUpDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import StudentFullReport from './StudentFullReport';
 
@@ -14,6 +14,17 @@ export default function StudentsList() {
   const [classFilter, setClassFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'default' | 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc'>('default');
+
+  const hasActiveFilters = searchTerm !== '' || classFilter !== 'all' || statusFilter !== 'all' || gradeFilter !== 'all' || sortBy !== 'default';
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setClassFilter('all');
+    setStatusFilter('all');
+    setGradeFilter('all');
+    setSortBy('default');
+  };
 
   // Form states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -251,6 +262,22 @@ export default function StudentsList() {
     return matchesSearch && matchesClass && matchesStatus && matchesGrade;
   });
 
+  const sortedStudents = [...filteredStudents].sort((a, b) => {
+    if (sortBy === 'name-asc') {
+      return a.name.localeCompare(b.name, 'ar');
+    }
+    if (sortBy === 'name-desc') {
+      return b.name.localeCompare(a.name, 'ar');
+    }
+    if (sortBy === 'date-desc') {
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    }
+    if (sortBy === 'date-asc') {
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    }
+    return 0;
+  });
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -380,42 +407,93 @@ export default function StudentsList() {
       </AnimatePresence>
 
       {/* Control Tools Filters */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96 shrink-0">
-          <input 
-            type="text" 
-            placeholder="البحث بالاسم المذكور أو بكود التسجيل..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#1A7FAA]/30 outline-none"
-          />
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+          {/* Search Box */}
+          <div className="relative flex-1">
+            <input 
+              type="text" 
+              placeholder="البحث بالاسم المذكور، كود القيد أو الباركود..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-55/40 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#1A7FAA]/30 outline-none transition-all"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          </div>
+
+          {/* Quick Stats or Active Filters Info */}
+          <div className="flex items-center gap-2 text-xs text-slate-500 justify-between lg:justify-end">
+            <span>عدد الطلاب المصفين: <strong className="text-[#0D5C8C]">{sortedStudents.length}</strong> من <strong className="text-slate-700">{students.length}</strong></span>
+            {hasActiveFilters && (
+              <button 
+                onClick={resetFilters}
+                className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+                إلغاء التصفية
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex w-full md:w-auto items-center gap-3 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="bg-transparent text-sm font-semibold text-slate-700 outline-none cursor-pointer">
-              <option value="all">كل الصفوف (الكل)</option>
-              <option value="الأول الإعدادي">الأول الإعدادي</option>
-              <option value="الثاني الإعدادي">الثاني الإعدادي</option>
-              <option value="الثالث الإعدادي">الثالث الإعدادي</option>
-              <option value="الأول الثانوي">الأول الثانوي</option>
-              <option value="الثاني الثانوي">الثاني الثانوي</option>
-              <option value="الثالث الثانوي">الثالث الثانوي</option>
-            </select>
+
+        {/* Advanced Filters & Sorting Controls */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          {/* 1. Level Filter */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div className="flex-1">
+              <span className="text-[9px] text-slate-400 block -mt-1 font-semibold">المستوى / الصف الدراسي</span>
+              <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                <option value="all">كل الصفوف الدراسية</option>
+                <option value="الأول الإعدادي">الأول الإعدادي</option>
+                <option value="الثاني الإعدادي">الثاني الإعدادي</option>
+                <option value="الثالث الإعدادي">الثالث الإعدادي</option>
+                <option value="الأول الثانوي">الأول الثانوي</option>
+                <option value="الثاني الثانوي">الثاني الثانوي</option>
+                <option value="الثالث الثانوي">الثالث الثانوي</option>
+              </select>
+            </div>
           </div>
-          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="bg-transparent text-sm font-semibold text-slate-700 outline-none cursor-pointer">
-              <option value="all">كل المجموعات (الكل)</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+
+          {/* 2. Class Filter */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div className="flex-1">
+              <span className="text-[9px] text-slate-400 block -mt-1 font-semibold">المجموعة التعليمية</span>
+              <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                <option value="all">كل المجموعات (الكل)</option>
+                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
           </div>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 outline-none cursor-pointer">
-            <option value="all">كل الحالات (مفعل/غير مفعل)</option>
-            <option value="active">المنتظمون فقط (مفعل)</option>
-            <option value="inactive">المجمدون فقط (غير مفعل)</option>
-          </select>
+
+          {/* 3. Status Filter */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div className="flex-1">
+              <span className="text-[9px] text-slate-400 block -mt-1 font-semibold">حالة الطالب بالسنتر</span>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                <option value="all">كل الحالات (نشط / موقوف)</option>
+                <option value="active">نشط (منتظم)</option>
+                <option value="inactive">موقوف (مجمد)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 4. Alphabetical & Date Sorting */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div className="flex-1">
+              <span className="text-[9px] text-slate-400 block -mt-1 font-semibold">ترتيب وتنسيق العرض</span>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                <option value="default">الترتيب الافتراضي</option>
+                <option value="name-asc">أبجدياً من أ إلى ي</option>
+                <option value="name-desc">أبجدياً من ي إلى أ</option>
+                <option value="date-desc">الأحدث تسجيلاً أولاً</option>
+                <option value="date-asc">الأقدم تسجيلاً أولاً</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -433,7 +511,7 @@ export default function StudentsList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 whitespace-nowrap">
-                {filteredStudents.length > 0 ? filteredStudents.map((student, index) => (
+                {sortedStudents.length > 0 ? sortedStudents.map((student, index) => (
                   <tr key={student.id} className="hover:bg-blue-50/30 transition-colors">
                     <td className="px-4 py-3 pr-6 text-xs text-slate-400 font-mono">
                       {(index + 1).toString().padStart(2, '0')}
