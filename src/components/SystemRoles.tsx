@@ -113,19 +113,28 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
     // Handled individually in submit
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.password) return;
     setErrorMsg('');
 
+    const isDuplicate = users.some(u => u.name.trim().toLowerCase() === formData.name?.trim().toLowerCase() && u.id !== editingId);
+    if (isDuplicate) {
+      setErrorMsg('هذا المعرف (الاسم) مسجل مسبقاً، يرجى اختيار اسم آخر.');
+      return;
+    }
+
     if (editingId) {
-      const updatedUser = { ...users.find(u => u.id === editingId), name: formData.name!, password: formData.password!, role: formData.role!, permissions: formData.permissions || [] } as SystemUser;
-      saveSystemUser(updatedUser).then(() => {
+      const updatedUser = { ...users.find(u => u.id === editingId), name: formData.name.trim(), password: formData.password.trim(), role: formData.role!, permissions: formData.permissions || [] } as SystemUser;
+      try {
+        await saveSystemUser(updatedUser);
         setSuccessMsg('تم تعديل بيانات المستخدم بنجاح');
         setUsers(users.map(u => u.id === editingId ? updatedUser : u));
-      }).catch(err => {
+      } catch (err) {
+        console.error(err);
         setErrorMsg('حدث خطأ أثناء الحفظ');
-      });
+        alert('حدث خطأ أثناء الحفظ في قاعدة البيانات. يرجى المحاولة مرة أخرى.');
+      }
     } else {
       // Limit verification for adding a new secretary
       
@@ -150,18 +159,22 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
       
       const newUser: SystemUser = {
         id: 'u-' + Date.now(),
-        name: formData.name,
+        name: formData.name.trim(),
         role: formData.role as 'teacher' | 'secretary',
         permissions: formData.permissions || [],
-        password: formData.password,
+        password: formData.password.trim(),
         tenantId: localStorage.getItem('sams_current_tenant_id') || 'default'
       };
-      saveSystemUser(newUser).then(() => {
+      
+      try {
+        await saveSystemUser(newUser);
         setSuccessMsg(formData.role === 'teacher' ? 'تم إضافة مدرس بنجاح' : 'تم إضافة سكرتيرة جديدة بنجاح');
         setUsers([...users, newUser]);
-      }).catch(err => {
+      } catch (err) {
+        console.error(err);
         setErrorMsg('حدث خطأ أثناء الإضافة');
-      });
+        alert('حدث خطأ أثناء الحفظ في قاعدة البيانات. يرجى المحاولة مرة أخرى.');
+      }
     }
     
     setShowAddForm(false);

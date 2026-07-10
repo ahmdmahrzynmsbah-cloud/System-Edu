@@ -358,7 +358,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
           totalSize += bytesSize;
 
           if (key.endsWith('sams_v2_students')) {
-            try { studentsCount = JSON.parse(val).length; } catch(e){}
+            try { studentsCount = JSON.parse(val).filter((s: any) => !s.deleted_at).length; } catch(e){}
           }
           if (key.endsWith('sams_v2_fees')) {
             try { feesCount = JSON.parse(val).length; } catch(e){}
@@ -430,7 +430,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
             totalCloudSize += bytesSize;
 
             if (docObj.key === 'sams_v2_students') {
-              try { studentsCount = Math.max(studentsCount, JSON.parse(docObj.data).length); } catch(e){}
+              try { studentsCount = Math.max(studentsCount, JSON.parse(docObj.data).filter((s: any) => !s.deleted_at).length); } catch(e){}
             }
             if (docObj.key === 'sams_v2_fees') {
               try { feesCount = Math.max(feesCount, JSON.parse(docObj.data).length); } catch(e){}
@@ -501,7 +501,9 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       features: ['dashboard', 'students', 'classes', 'attendance', 'exams', 'fees', 'notifications', 'settings'],
       maxStudents: 100,
       maxSecretaries: 3,
-      whatsappGatewayEnabled: true
+      whatsappGatewayEnabled: true,
+      announcementsEnabled: true,
+      analyticsEnabled: true
     });
     setShowAddModal(true);
   };
@@ -532,9 +534,9 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       pricePaid: Number(formData.pricePaid) || 0,
       maxStudents: Number(formData.maxStudents) || 100,
       maxSecretaries: Number(formData.maxSecretaries) || 3,
-      whatsappGatewayEnabled: formData.whatsappGatewayEnabled,
-      announcementsEnabled: formData.announcementsEnabled,
-      analyticsEnabled: formData.analyticsEnabled
+      whatsappGatewayEnabled: formData.whatsappGatewayEnabled !== false,
+      announcementsEnabled: formData.announcementsEnabled !== false,
+      analyticsEnabled: formData.analyticsEnabled !== false
     };
 
     saveTenant(newTenant).then(() => {
@@ -607,9 +609,9 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
           pricePaid: Number(formData.pricePaid) || 0,
           maxStudents: Number(formData.maxStudents) || 100,
           maxSecretaries: Number(formData.maxSecretaries) || 3,
-          whatsappGatewayEnabled: formData.whatsappGatewayEnabled,
-          announcementsEnabled: formData.announcementsEnabled,
-          analyticsEnabled: formData.analyticsEnabled
+          whatsappGatewayEnabled: formData.whatsappGatewayEnabled !== false,
+          announcementsEnabled: formData.announcementsEnabled !== false,
+          analyticsEnabled: formData.analyticsEnabled !== false
         };
       }
       return t;

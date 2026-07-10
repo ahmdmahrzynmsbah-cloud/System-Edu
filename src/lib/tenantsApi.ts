@@ -11,6 +11,8 @@ export interface Tenant {
   maxStudents?: number;
   maxSecretaries?: number;
   whatsappGatewayEnabled?: boolean;
+  announcementsEnabled?: boolean;
+  analyticsEnabled?: boolean;
   status: 'active' | 'suspended';
   appName?: string;
   features?: string[];

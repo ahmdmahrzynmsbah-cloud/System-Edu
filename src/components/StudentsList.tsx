@@ -43,6 +43,7 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
   const [sortBy, setSortBy] = useState<'default' | 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc'>('default');
 
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
 
   const hasActiveFilters = searchTerm !== '' || classFilter.length > 0 || statusFilter !== 'all' || gradeFilter !== 'all' || sortBy !== 'default' || feeStatusFilter !== 'all' || feeCheckMonth !== 'يوليو 2026';
 
@@ -419,6 +420,37 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
 
   const cancelDelete = () => {
     setStudentToDelete(null);
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedStudents(sortedStudents.map(s => s.id));
+    } else {
+      setSelectedStudents([]);
+    }
+  };
+
+  const handleSelectStudent = (studentId: string) => {
+    setSelectedStudents(prev => 
+      prev.includes(studentId) 
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  const handleBulkStatusUpdate = (newStatus: 'active' | 'inactive') => {
+    if (selectedStudents.length === 0) return;
+    
+    selectedStudents.forEach(id => {
+      const student = students.find(s => s.id === id);
+      if (student) {
+        samsDb.updateStudent({ ...student, status: newStatus });
+      }
+    });
+    
+    setSuccessMessage(`تم تحديث حالة ${selectedStudents.length} طلاب بنجاح.`);
+    setSelectedStudents([]);
+    loadData();
   };
 
   const isStudentPaid = (studentId: string, month: string) => {
@@ -1057,13 +1089,53 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
         </div>
       </div>
 
+      {selectedStudents.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-slate-800 border border-slate-700 rounded-2xl p-3 md:p-4 mb-4 flex flex-wrap items-center justify-between gap-4 shadow-lg shadow-slate-900/10"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex items-center justify-center bg-white text-slate-800 w-7 h-7 rounded-full text-sm font-bold shadow-sm">
+              {selectedStudents.length}
+            </span>
+            <span className="text-sm font-bold text-white">طالب محدد لتحديث الحالة الجماعي</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button 
+              onClick={() => handleBulkStatusUpdate('active')}
+              className="px-4 py-2.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
+            >
+              <CheckCircle className="w-4 h-4" />
+              تعيين كنشط (منتظم)
+            </button>
+            <button 
+              onClick={() => handleBulkStatusUpdate('inactive')}
+              className="px-4 py-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4" />
+              تعيين كموقوف (مجمد)
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {/* Desktop View Table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-right">
               <thead className="bg-slate-50 text-slate-600 font-bold border-b border-gray-100 whitespace-nowrap">
                 <tr>
-                  <th className="px-4 py-4 pr-6">م</th>
+                  <th className="px-4 py-4 pr-6 w-20 flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-gray-300 text-slate-600 focus:ring-slate-600 cursor-pointer"
+                      checked={selectedStudents.length === sortedStudents.length && sortedStudents.length > 0}
+                      onChange={handleSelectAll}
+                      title="تحديد الكل"
+                    />
+                    <span>م</span>
+                  </th>
                   <th className="px-4 py-4 min-w-[200px]">بيانات الطالب</th>
                   <th className="px-4 py-4 min-w-[150px]">المجموعة والصف الدراسي</th>
                   <th className="px-4 py-4 min-w-[140px]">رقم ولي الأمر</th>
@@ -1083,8 +1155,14 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
                           : 'bg-rose-50/20 hover:bg-rose-50/40 transition-colors border-r-4 border-r-rose-500/70'
                       }
                     >
-                      <td className="px-4 py-3 pr-6 text-xs text-slate-400 font-mono">
-                        {(index + 1).toString().padStart(2, '0')}
+                      <td className="px-4 py-3 pr-6 text-xs text-slate-400 font-mono flex items-center gap-3">
+                        <input 
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300 text-slate-600 focus:ring-slate-600 cursor-pointer"
+                          checked={selectedStudents.includes(student.id)}
+                          onChange={() => handleSelectStudent(student.id)}
+                        />
+                        <span>{(index + 1).toString().padStart(2, '0')}</span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -1233,6 +1311,12 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
                 {/* Header info */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
+                    <input 
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-slate-600 focus:ring-slate-600 cursor-pointer"
+                      checked={selectedStudents.includes(student.id)}
+                      onChange={() => handleSelectStudent(student.id)}
+                    />
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-sm border ${
                       paid 
                         ? 'bg-slate-50 border-slate-100 text-slate-400' 
