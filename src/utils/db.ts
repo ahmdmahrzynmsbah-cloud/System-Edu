@@ -381,6 +381,16 @@ export const samsDb = {
     addAuditLog('INSERT', 'classes', cls.id, `إنشاء مجموعة دراسي جديد: ${cls.name}`);
   },
 
+  
+  updateClass(updatedCls: ClassRoom) {
+    const classes = this.getClasses();
+    const idx = classes.findIndex(c => c.id === updatedCls.id);
+    if (idx !== -1) {
+      classes[idx] = updatedCls;
+      saveToStorage(KEYS.CLASSES, classes);
+      addAuditLog('UPDATE', 'classes', updatedCls.id, `تحديث بيانات المجموعة الدراسية: ${updatedCls.name}`);
+    }
+  },
   deleteClass(id: string): { success: boolean; error?: string } {
     const students = this.getStudents();
     const classStudents = students.filter(s => (s.class_ids || [s.class_id, s.class_id_2].filter(Boolean)).includes(id));

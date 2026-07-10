@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ClassRoom, Teacher, Subject, CenterScheduleData, Student } from '../types';
 import { samsDb } from '../utils/db';
-import { Plus, BookOpen, User, Users, Maximize2, Search, ShieldAlert, Check, Calendar, Trash2, CheckCircle, X, ExternalLink, Eye, ArrowRight, Phone, Info } from 'lucide-react';
+import { Plus, BookOpen, User, Users, Maximize2, Search, ShieldAlert, Check, Calendar, Trash2, Edit, CheckCircle, X, ExternalLink, Eye, ArrowRight, Phone, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ClassesManager() {
@@ -16,6 +16,7 @@ export default function ClassesManager() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [showAddClass, setShowAddClass] = useState(false);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [errorText, setErrorText] = useState('');
   const [classGradeFilter, setClassGradeFilter] = useState('all');
   const [classSearchQuery, setClassSearchQuery] = useState('');
@@ -83,6 +84,28 @@ export default function ClassesManager() {
     setSchedule(samsDb.getCenterSchedule());
   };
 
+  
+  const handleEditClass = (cls: ClassRoom) => {
+    setClassForm({
+      name: cls.name,
+      schedule_days: cls.schedule_days || '',
+      schedule_time: cls.schedule_time || '',
+      grade_level: cls.grade_level
+    });
+    try {
+      if (cls.schedule_time && cls.schedule_time.startsWith('{')) {
+        setDayTimes(JSON.parse(cls.schedule_time));
+      } else {
+        setDayTimes({});
+      }
+    } catch(e) {
+      setDayTimes({});
+    }
+    setEditingClassId(cls.id);
+    setShowAddClass(true);
+    setTimeout(() => { document.getElementById('add-class-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+  };
+
   const handleCreateClass = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorText('');
@@ -109,7 +132,7 @@ export default function ClassesManager() {
     }
 
     const newCls: ClassRoom = {
-      id: `c-${Date.now()}`,
+      id: editingClassId || `c-${Date.now()}`,
       name: classForm.name,
       schedule_days: classForm.schedule_days,
       schedule_time: JSON.stringify(dayTimes),
@@ -117,7 +140,14 @@ export default function ClassesManager() {
       grade_level: classForm.grade_level
     };
 
-    samsDb.addClass(newCls);
+    if (editingClassId) {
+      samsDb.updateClass(newCls);
+      setSuccessText('تم تحديث المجموعة بنجاح!');
+    } else {
+      samsDb.addClass(newCls);
+      setSuccessText('تم إضافة المجموعة بنجاح!');
+    }
+    
     setClassForm({
       name: '',
       schedule_days: '',
@@ -125,10 +155,10 @@ export default function ClassesManager() {
       grade_level: 'الأول الإعدادي'
     });
     setDayTimes({});
+    setEditingClassId(null);
     setShowAddClass(false);
     loadData();
   };
-
 
   const formatDisplaySchedule = (cls: ClassRoom) => {
     if (!cls.schedule_days) return 'المواعيد غير محددة';
@@ -415,8 +445,8 @@ export default function ClassesManager() {
 
       {/* Initialize classroom form */}
       {showAddClass && (
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm animate-slide-up">
-          <h3 className="font-bold text-[#0D5C8C] text-sm mb-4 border-b border-gray-50 pb-2">تأسيس مجموعة دراسية جديدة</h3>
+        <div id="add-class-form" className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm animate-slide-up">
+          <h3 className="font-bold text-[#0D5C8C] text-sm mb-4 border-b border-gray-50 pb-2">{editingClassId ? "تعديل بيانات المجموعة" : "تأسيس مجموعة دراسية جديدة"}</h3>
           <form onSubmit={handleCreateClass} className="grid grid-cols-1 md:grid-cols-4 gap-4">
             
             <div className="space-y-1">
@@ -494,7 +524,7 @@ export default function ClassesManager() {
             <div className="md:col-span-4 flex justify-end gap-2 border-t border-slate-50 pt-3">
               <button
                 type="button"
-                onClick={() => setShowAddClass(false)}
+                onClick={() => { setShowAddClass(false); setEditingClassId(null); setClassForm({ name: "", schedule_days: "", schedule_time: "", grade_level: "الأول الإعدادي" }); setDayTimes({}); }}
                 className="px-4 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-slate-600 font-bold shrink-0 cursor-pointer"
               >
                 إلغاء
@@ -503,7 +533,7 @@ export default function ClassesManager() {
                 type="submit"
                 className="px-5 py-2 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white text-xs font-bold rounded-lg shrink-0 cursor-pointer"
               >
-                تأسيس المجموعة الدراسية
+                {editingClassId ? "تحديث بيانات المجموعة" : "تأسيس المجموعة الدراسية"}
               </button>
             </div>
 
@@ -563,6 +593,13 @@ export default function ClassesManager() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-slate-800 text-sm">{cls.name}</h3>
 
+                  <button
+                    onClick={() => handleEditClass(cls)}
+                    className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all cursor-pointer ml-1"
+                    title="تعديل المجموعة"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => setClassToDelete(cls)}
                     className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
