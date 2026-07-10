@@ -110,20 +110,46 @@ export default function FeesTracker() {
   // Quick payment modal states
   const [showQuickPayModal, setShowQuickPayModal] = useState(false);
   const [quickPayStudent, setQuickPayStudent] = useState<Student | null>(null);
-  const [quickPayAmount, setQuickPayAmount] = useState<number>(250);
+  const [quickPayAmount, setQuickPayAmount] = useState<number | ''>(250);
   const [quickPayMethod, setQuickPayMethod] = useState<FeePayment['payment_method']>('cash');
   const [quickPayNotify, setQuickPayNotify] = useState<boolean>(true);
+  const [quickPayCategory, setQuickPayCategory] = useState<FeePayment['category']>('tuition');
+  const [quickPaySessionCount, setQuickPaySessionCount] = useState<number | ''>(4);
+  const [quickPaySessionPrice, setQuickPaySessionPrice] = useState<number | ''>(50);
 
   // General payment form states (Tab 2)
   const [showGeneralPayForm, setShowGeneralPayForm] = useState(false);
   const [generalPayData, setGeneralPayData] = useState({
     student_id: '',
-    amount: 250,
+    amount: 250 as number | '',
     payment_method: 'cash' as FeePayment['payment_method'],
     category: 'tuition' as FeePayment['category'],
     term: 'first_term' as FeePayment['term'],
-    month: 'يوليو 2026'
+    month: 'يوليو 2026',
+    session_count: 4 as number | '',
+    session_price: 50 as number | ''
   });
+
+  // Automatically calculate general payment amount based on session count and price
+  useEffect(() => {
+    if (generalPayData.category === 'sessions') {
+      const count = generalPayData.session_count === '' ? 0 : Number(generalPayData.session_count);
+      const price = generalPayData.session_price === '' ? 0 : Number(generalPayData.session_price);
+      setGeneralPayData(prev => ({
+        ...prev,
+        amount: count * price
+      }));
+    }
+  }, [generalPayData.category, generalPayData.session_count, generalPayData.session_price]);
+
+  // Automatically calculate quick pay amount based on session count and price
+  useEffect(() => {
+    if (quickPayCategory === 'sessions') {
+      const count = quickPaySessionCount === '' ? 0 : Number(quickPaySessionCount);
+      const price = quickPaySessionPrice === '' ? 0 : Number(quickPaySessionPrice);
+      setQuickPayAmount(count * price);
+    }
+  }, [quickPayCategory, quickPaySessionCount, quickPaySessionPrice]);
 
   // Monthly group fees rate config
   const [gradeFees, setGradeFees] = useState<Record<string, number>>(() => {
@@ -203,17 +229,19 @@ export default function FeesTracker() {
     e.preventDefault();
     if (!quickPayStudent) return;
 
-    // Check if already paid for this month
-    const alreadyPaid = payments.some(
-      p => p.student_id === quickPayStudent.id && 
-           p.category === 'tuition' && 
-           p.month === selectedMonth
-    );
+    // Check if already paid for this month (only if tuition subscription)
+    if (quickPayCategory === 'tuition') {
+      const alreadyPaid = payments.some(
+        p => p.student_id === quickPayStudent.id && 
+             p.category === 'tuition' && 
+             p.month === selectedMonth
+      );
 
-    if (alreadyPaid) {
-      setErrorInfo(`الطالب ${quickPayStudent.name} مسجل كمدفوع له بالفعل لشهر ${selectedMonth}`);
-      setShowQuickPayModal(false);
-      return;
+      if (alreadyPaid) {
+        setErrorInfo(`الطالب ${quickPayStudent.name} مسجل كمدفوع له بالفعل لشهر ${selectedMonth}`);
+        setShowQuickPayModal(false);
+        return;
+      }
     }
 
     // Register payment
@@ -223,15 +251,21 @@ export default function FeesTracker() {
       payment_date: new Date().toISOString().split('T')[0],
       payment_method: quickPayMethod,
       term: 'first_term', // Default term
-      category: 'tuition',
-      month: selectedMonth
+      category: quickPayCategory,
+      month: quickPayCategory === 'tuition' ? selectedMonth : undefined,
+      session_count: quickPayCategory === 'sessions' ? (quickPaySessionCount === '' ? undefined : Number(quickPaySessionCount)) : undefined,
+      session_price: quickPayCategory === 'sessions' ? (quickPaySessionPrice === '' ? undefined : Number(quickPaySessionPrice)) : undefined
     });
 
     // Simulated SMS message to parent
     if (quickPayNotify) {
+      const msgDetails = quickPayCategory === 'sessions' 
+        ? `حضور عدد (${quickPaySessionCount}) حصص بسعر (${quickPaySessionPrice} ج.م) للحصة`
+        : `اشتراك شهر (${selectedMonth})`;
+
       samsDb.addNotification({
         title: `تأكيد استلام اشتراك: ${quickPayStudent.name}`,
-        message: `تم بحمد الله استلام قيمة اشتراك شهر (${selectedMonth}) والمقدرة بـ ${quickPayAmount} ج.م للطالب ${quickPayStudent.name}. إيصال سداد رقم: ${newPayment.receipt_number}. شكراً لكم.`,
+        message: `تم بحمد الله استلام قيمة ${msgDetails} والمقدرة بـ ${quickPayAmount} ج.م للطالب ${quickPayStudent.name}. إيصال سداد رقم: ${newPayment.receipt_number}. شكراً لكم.`,
         category: 'sms',
         recipient_type: 'specific',
         recipient_id: quickPayStudent.id
@@ -239,7 +273,11 @@ export default function FeesTracker() {
     }
 
     playCashRegisterSound();
-    setSuccessInfo(`تم سداد اشتراك شهر ${selectedMonth} للطالب: ${quickPayStudent.name} بنجاح! رقم الإيصال: ${newPayment.receipt_number}`);
+    setSuccessInfo(
+      quickPayCategory === 'sessions'
+        ? `تم سداد قيمة الحصص للطالب: ${quickPayStudent.name} بنجاح! رقم الإيصال: ${newPayment.receipt_number}`
+        : `تم سداد اشتراك شهر ${selectedMonth} للطالب: ${quickPayStudent.name} بنجاح! رقم الإيصال: ${newPayment.receipt_number}`
+    );
     
     // Autoopen receipt for printing
     setSelectedReceipt(newPayment);
@@ -262,7 +300,9 @@ export default function FeesTracker() {
       payment_method: generalPayData.payment_method,
       category: generalPayData.category,
       term: generalPayData.term,
-      month: generalPayData.category === 'tuition' ? generalPayData.month : undefined
+      month: generalPayData.category === 'tuition' ? generalPayData.month : undefined,
+      session_count: generalPayData.category === 'sessions' ? (generalPayData.session_count === '' ? undefined : Number(generalPayData.session_count)) : undefined,
+      session_price: generalPayData.category === 'sessions' ? (generalPayData.session_price === '' ? undefined : Number(generalPayData.session_price)) : undefined
     });
 
     playCashRegisterSound();
@@ -273,11 +313,13 @@ export default function FeesTracker() {
     // Reset general pay data
     setGeneralPayData({
       student_id: '',
-      amount: 250,
+      amount: 250 as number | '',
       payment_method: 'cash',
       category: 'tuition',
       term: 'first_term',
-      month: selectedMonth
+      month: selectedMonth,
+      session_count: 4 as number | '',
+      session_price: 50 as number | ''
     });
 
     loadData();
@@ -304,10 +346,13 @@ export default function FeesTracker() {
   };
 
   // Students in selected class
-  const classStudents = students.filter(s => {
-    const studentClass = classes.find(c => c.id === s.class_id);
-    if (selectedClass !== 'all') return s.class_id === selectedClass;
-    return studentClass?.grade_level === selectedGrade;
+  const classStudents = students.filter(student => {
+    const currentClassIds = student.class_ids || [student.class_id, student.class_id_2].filter(Boolean);
+    if (selectedClass !== 'all') {
+      return currentClassIds.includes(selectedClass);
+    }
+    const studentClasses = currentClassIds.map(id => classes.find(c => c.id === id)).filter(Boolean);
+    return studentClasses.some(c => c.grade_level === selectedGrade) || student.grade_level === selectedGrade;
   });
   
   // Filter students based on search query
@@ -329,11 +374,13 @@ export default function FeesTracker() {
     .filter(p => {
       const student = students.find(s => s.id === p.student_id);
       if (!student) return false;
-      const studentClass = classes.find(c => c.id === student.class_id);
+      const currentClassIds = student.class_ids || [student.class_id, student.class_id_2].filter(Boolean);
       if (selectedClass !== 'all') {
-        if (student.class_id !== selectedClass) return false;
+        if (!currentClassIds.includes(selectedClass)) return false;
       } else {
-        if (studentClass?.grade_level !== selectedGrade) return false;
+        const studentClasses = currentClassIds.map(id => classes.find(c => c.id === id)).filter(Boolean);
+        const matchesGrade = studentClasses.some(c => c.grade_level === selectedGrade) || student.grade_level === selectedGrade;
+        if (!matchesGrade) return false;
       }
       return p.category === 'tuition' && p.month === selectedMonth;
     })
@@ -366,8 +413,8 @@ export default function FeesTracker() {
               <span className="text-[11px] font-bold text-slate-500 pr-1">قيمة اشتراك للصف المحدد:</span>
               <input 
                 type="number" 
-                value={activeGradeMonthlyFee}
-                onChange={(e) => handleSaveGradeFee(selectedGrade, Number(e.target.value))}
+                value={activeGradeMonthlyFee === 0 ? '' : activeGradeMonthlyFee}
+                onChange={(e) => handleSaveGradeFee(selectedGrade, e.target.value === '' ? 0 : Number(e.target.value))}
                 className="w-16 text-center text-xs font-sans font-bold text-[#0D5C8C] bg-white border border-slate-200 rounded-md py-1 px-1.5 focus:outline-hidden"
                 title="عدّل قيمة اشتراك الشهر لهذا الصف واحفظ لتتغير قيمة السداد التلقائية لكل الطلاب"
               />
@@ -453,19 +500,6 @@ export default function FeesTracker() {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">قيمة المبلغ المدفوع (ج.م) *</label>
-              <input
-                type="number"
-                min={10}
-                max={15000}
-                value={generalPayData.amount}
-                onChange={(e) => setGeneralPayData({ ...generalPayData, amount: Number(e.target.value) })}
-                className="w-full text-xs font-sans border border-slate-200 px-3 py-2 rounded-lg text-slate-700 text-right"
-                required
-              />
-            </div>
-
-            <div className="space-y-1">
               <label className="block text-xs font-bold text-slate-700">نوع البند الدراسي الرسومي</label>
               <select
                 value={generalPayData.category}
@@ -473,10 +507,28 @@ export default function FeesTracker() {
                 className="w-full text-xs font-sans border border-slate-200 p-2.5 rounded-lg text-slate-700 bg-white"
               >
                 <option value="tuition">اشتراك الشهر الدراسي (Tuition)</option>
+                <option value="sessions">فلوس حصص حضر (بعدد الحصص وسعرها)</option>
                 <option value="bus">اشتراك الباص ونقل السنتر</option>
                 <option value="uniform">الزي المدرسي والملازم الأساسية</option>
                 <option value="activities">رحلات سنوية وأنشطة إضافية</option>
               </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-slate-700">
+                قيمة المبلغ المدفوع (ج.م) *
+                {generalPayData.category === 'sessions' && <span className="text-xxs text-indigo-600 block">(محسوب تلقائياً)</span>}
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={15000}
+                value={generalPayData.amount === '' ? '' : generalPayData.amount}
+                onChange={(e) => setGeneralPayData({ ...generalPayData, amount: e.target.value === '' ? '' : Number(e.target.value) })}
+                className={`w-full text-xs font-sans border border-slate-200 px-3 py-2.5 rounded-lg text-slate-700 text-right ${generalPayData.category === 'sessions' ? 'bg-slate-50 font-bold text-indigo-700 border-indigo-200' : ''}`}
+                required
+                disabled={generalPayData.category === 'sessions'}
+              />
             </div>
 
             <div className="space-y-1">
@@ -492,8 +544,37 @@ export default function FeesTracker() {
               </select>
             </div>
 
+            {generalPayData.category === 'sessions' && (
+              <>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">عدد الحصص التي حضرها الطالب *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={generalPayData.session_count === '' ? '' : generalPayData.session_count}
+                    onChange={(e) => setGeneralPayData({ ...generalPayData, session_count: e.target.value === '' ? '' : Number(e.target.value) })}
+                    className="w-full text-xs font-sans border border-indigo-200 px-3 py-2 rounded-lg text-slate-700 text-right focus:border-[#0D5C8C] focus:outline-hidden"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">سعر الحصة الواحدة (ج.م) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={generalPayData.session_price === '' ? '' : generalPayData.session_price}
+                    onChange={(e) => setGeneralPayData({ ...generalPayData, session_price: e.target.value === '' ? '' : Number(e.target.value) })}
+                    className="w-full text-xs font-sans border border-indigo-200 px-3 py-2 rounded-lg text-slate-700 text-right focus:border-[#0D5C8C] focus:outline-hidden"
+                    required
+                  />
+                </div>
+              </>
+            )}
+
             {generalPayData.category === 'tuition' && (
-              <div className="space-y-1 md:col-span-2">
+              <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700">سداد لاشتراك شهر:</label>
                 <select
                   value={generalPayData.month}
@@ -649,7 +730,7 @@ export default function FeesTracker() {
               <span className="text-[10px] bg-[#0D5C8C]/5 text-[#0D5C8C] px-3 py-1 rounded-full font-bold">الشهر المعروض: {selectedMonth}</span>
             </div>
 
-            <div className="overflow-x-auto border border-gray-50 rounded-xl">
+            <div className="hidden md:block overflow-x-auto border border-gray-50 rounded-xl">
               <table className="min-w-full text-right" dir="rtl">
                 <thead className="bg-slate-50 text-slate-700 text-xs font-bold border-b border-gray-100">
                   <tr>
@@ -786,6 +867,128 @@ export default function FeesTracker() {
               </table>
             </div>
 
+            {/* Mobile View Cards list (One-touch interaction) */}
+            <div className="block md:hidden space-y-3">
+              {filteredClassStudents.map(student => {
+                const currentMonthPayment = payments.find(
+                  p => p.student_id === student.id && 
+                       p.category === 'tuition' && 
+                       p.month === selectedMonth
+                );
+                const isPaidThisMonth = !!currentMonthPayment;
+
+                return (
+                  <div key={student.id} className={`p-4 rounded-xl border transition-all space-y-3 ${
+                    isPaidThisMonth ? 'bg-emerald-50/10 border-emerald-100' : 'bg-white border-slate-100 shadow-2xs'
+                  }`}>
+                    {/* Header */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-mono font-black text-[#0D5C8C] bg-sky-50 px-1.5 py-0.5 rounded">
+                          #{student.registration_id}
+                        </span>
+                        <h4 className="font-bold text-slate-800 text-xs mt-1.5 leading-tight">{student.name}</h4>
+                        <span className="text-[9px] text-slate-400 block mt-1">الهاتف: {student.phone} | ولي الأمر: {student.parent_phone}</span>
+                      </div>
+                      
+                      {/* Current Status Badge */}
+                      {isPaidThisMonth ? (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md font-bold text-[9px] flex items-center gap-0.5">
+                          <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                          <span>مسدد</span>
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-100 rounded-md font-bold text-[9px] flex items-center gap-0.5 animate-pulse">
+                          <AlertCircle className="w-2.5 h-2.5 text-rose-600 shrink-0" />
+                          <span>متأخر</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Timeline past months */}
+                    <div className="bg-slate-50/50 p-2 rounded-lg border border-slate-100">
+                      <span className="text-[9px] text-slate-400 font-bold block mb-1">حالة الشهور السابقة:</span>
+                      <div className="flex items-center gap-1.5">
+                        {timelineMonths.map((m) => {
+                          const paidForThisTimelineMonth = payments.some(
+                            p => p.student_id === student.id && 
+                                 p.category === 'tuition' && 
+                                 p.month === m
+                          );
+                          const isTargetMonth = m === selectedMonth;
+
+                          return (
+                            <div 
+                              key={m} 
+                              className={`flex-1 flex flex-col items-center py-1 rounded text-[8px] font-bold border transition-all ${
+                                paidForThisTimelineMonth 
+                                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-700' 
+                                  : isTargetMonth 
+                                  ? 'bg-slate-100 border-slate-200 text-slate-400'
+                                  : 'bg-rose-50/70 border-rose-200 text-rose-700 font-semibold'
+                              }`}
+                            >
+                              <span className="truncate w-full text-center">{m.split(' ')[0]}</span>
+                              <span className="text-[7px] mt-0.5">
+                                {paidForThisTimelineMonth ? '✓' : '✖'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-end pt-1">
+                      {isPaidThisMonth ? (
+                        <div className="flex items-center gap-1.5 w-full justify-between">
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md">
+                            مبلغ الاشتراك: {currentMonthPayment.amount} ج.م
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReceipt(currentMonthPayment)}
+                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[#0D5C8C] border border-slate-150 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>إيصال #{currentMonthPayment.receipt_number.split('-').pop()}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPaymentToDelete(currentMonthPayment)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg border border-slate-150 hover:bg-red-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickPayStudent(student);
+                            setQuickPayAmount(activeGradeMonthlyFee);
+                            setShowQuickPayModal(true);
+                          }}
+                          className="w-full py-2.5 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer text-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>سداد اشتراك {selectedMonth} 💸</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredClassStudents.length === 0 && (
+                <div className="p-8 text-center text-slate-500 font-sans border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                  <span className="text-xs">لا يوجد طلاب يطابقون بحثك ضمن الشروط المحددة.</span>
+                </div>
+              )}
+            </div>
+
             {/* General Instructions Card */}
             <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex items-start gap-2 text-right">
               <span className="text-sm">💡</span>
@@ -811,7 +1014,7 @@ export default function FeesTracker() {
             <span className="text-xxs font-bold text-slate-400">إجمالي السجلات المستردة: {payments.length} إيصالات</span>
           </div>
 
-          <div className="overflow-x-auto border border-gray-50 rounded-xl">
+          <div className="hidden md:block overflow-x-auto border border-gray-50 rounded-xl">
             <table className="min-w-full text-right" dir="rtl">
               <thead className="bg-slate-50 text-slate-700 text-xs font-bold border-b border-gray-100">
                 <tr>
@@ -916,131 +1119,301 @@ export default function FeesTracker() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
 
+          {/* Mobile View Cards list (One-touch interaction) */}
+          <div className="block md:hidden space-y-3">
+            {payments.map(item => {
+              const s = students.find(studentItem => studentItem.id === item.student_id);
+              return (
+                <div key={item.id} className="p-4 rounded-xl border border-slate-100 bg-white shadow-2xs space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-mono font-black text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded">
+                        {item.receipt_number}
+                      </span>
+                      <h4 className="font-bold text-slate-800 text-xs mt-1.5 leading-tight">{s ? s.name : 'ـ طالب مُستبعد ـ'}</h4>
+                      <span className="text-[9px] text-slate-400 block mt-1">تاريخ المعاملة: {item.payment_date}</span>
+                    </div>
 
-      {/* QUICK SUBSCRIPTION PAYMENT MODAL */}
-      {showQuickPayModal && quickPayStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden animate-scale-up text-right">
-            
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[#0D5C8C] to-[#1A7FAA] p-4 text-white flex justify-between items-center">
-              <h3 className="font-bold text-sm flex items-center gap-1.5">
-                <Coins className="w-4 h-4 text-amber-300" />
-                <span>سداد اشتراك شهري فوري</span>
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setShowQuickPayModal(false)} 
-                className="text-white/80 hover:text-white font-bold text-sm bg-black/10 hover:bg-black/20 px-2.5 py-0.5 rounded"
-              >
-                ×
-              </button>
-            </div>
+                    <div className="text-left">
+                      <span className="text-xs font-black text-[#0D5C8C] block">{item.amount.toLocaleString()} ج.م</span>
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold mt-1 ${
+                        item.payment_method === 'cash'
+                          ? 'bg-emerald-50 text-emerald-800'
+                          : item.payment_method === 'card'
+                          ? 'bg-indigo-50 text-indigo-800'
+                          : 'bg-amber-50 text-amber-800'
+                      }`}>
+                        {item.payment_method === 'cash' ? 'نقدي' : item.payment_method === 'card' ? 'فيزا' : 'حوالة'}
+                      </span>
+                    </div>
+                  </div>
 
-            {/* Form */}
-            <form onSubmit={handleQuickPaySubmit} className="p-5 space-y-4">
-              
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-150 space-y-2">
-                <div className="text-slate-400 text-xxs font-bold uppercase">بيانات الطالب والمجموعة:</div>
-                <div className="text-xs font-black text-slate-800">{quickPayStudent.name}</div>
-                <div className="text-[10px] text-slate-500 font-sans">
-                  مجموعة: {classes.find(c => c.id === quickPayStudent.class_id)?.name || 'غير محددة'} • رقم القيد: #{quickPayStudent.registration_id}
+                  <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100/70 text-[10px]">
+                    <div>
+                      <span className="text-slate-400 block text-[8px] font-bold">بند الرسوم</span>
+                      <span className="font-bold text-slate-700">
+                        {item.category === 'tuition'
+                          ? 'مصاريف دراسية شهري'
+                          : item.category === 'sessions'
+                          ? `حصص حضر (${item.session_count} × ${item.session_price} ج.م)`
+                          : item.category === 'bus'
+                          ? 'باص وحافلة السنتر'
+                          : item.category === 'uniform'
+                          ? 'زي وملازم'
+                          : 'أنشطة وخدمات ترفيهية'}
+                      </span>
+                    </div>
+
+                    {item.category === 'tuition' && (
+                      <div>
+                        <span className="text-slate-400 block text-[8px] font-bold text-left">شهر الاشتراك</span>
+                        <span className="font-bold text-slate-600 text-left block">{item.month || 'ـ'}</span>
+                      </div>
+                    )}
+                    {item.category === 'sessions' && (
+                      <div>
+                        <span className="text-slate-400 block text-[8px] font-bold text-left">التفاصيل</span>
+                        <span className="font-bold text-slate-600 text-left block">{item.session_count} حصص</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile action buttons */}
+                  <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-slate-100/50">
+                    <button
+                      onClick={() => setSelectedReceipt(item)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-[#0D5C8C] border border-slate-150 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer"
+                      title="عرض الإيصال لطباعته"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>عرض الإيصال</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentToDelete(item)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 border border-slate-150 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                      title="حذف السجل"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="text-xs font-bold text-[#0D5C8C] pt-1">
-                  سداد اشتراك شهر: <span className="underline">{selectedMonth}</span>
-                </div>
+              );
+            })}
+
+            {payments.length === 0 && (
+              <div className="p-8 text-center text-slate-500 font-sans border border-dashed border-slate-250 rounded-xl bg-slate-50">
+                <span className="text-xs">لا توجد أي معاملات سداد مسجلة حتى الآن.</span>
               </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">قيمة الاشتراك المطلوب تحصيلها (ج.م) *</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={5000}
-                  value={quickPayAmount}
-                  onChange={(e) => setQuickPayAmount(Number(e.target.value))}
-                  className="w-full text-xs font-sans font-extrabold border border-slate-300 px-3 py-2.5 rounded-lg text-[#0D5C8C] text-right focus:border-[#0D5C8C] focus:outline-hidden"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">طريقة التحصيل واستلام المال:</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setQuickPayMethod('cash')}
-                    className={`p-2.5 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
-                      quickPayMethod === 'cash'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    نقدي 💵
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setQuickPayMethod('card')}
-                    className={`p-2.5 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
-                      quickPayMethod === 'card'
-                        ? 'bg-indigo-50 border-indigo-500 text-indigo-800'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    فيزا POS 💳
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setQuickPayMethod('transfer')}
-                    className={`p-2.5 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
-                      quickPayMethod === 'transfer'
-                        ? 'bg-amber-50 border-amber-500 text-amber-800'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Vodafone 📲
-                  </button>
-                </div>
-              </div>
-
-              {/* SMS Notification simulation option */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  id="sms_notify_parent"
-                  type="checkbox"
-                  checked={quickPayNotify}
-                  onChange={(e) => setQuickPayNotify(e.target.checked)}
-                  className="w-4 h-4 text-[#0D5C8C] border-slate-300 rounded focus:ring-[#0D5C8C] cursor-pointer"
-                />
-                <label htmlFor="sms_notify_parent" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                  إرسال رسالة تأكيد الدفع لولي الأمر تلقائياً (صامتاً عبر بوابة الإشعارات) ✉️
-                </label>
-              </div>
-
-              <div className="flex gap-2 border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowQuickPayModal(false)}
-                  className="flex-1 py-2 text-xs border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 font-bold cursor-pointer"
-                >
-                  إلغاء المعاملة
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
-                >
-                  تأكيد التحصيل واستلام الإيصال ✓
-                </button>
-              </div>
-
-            </form>
-
+            )}
           </div>
         </div>
       )}
+
+      {/* QUICK SUBSCRIPTION PAYMENT MODAL */}
+      {showQuickPayModal && quickPayStudent && (() => {
+        const studentClass = classes.find(c => c.id === quickPayStudent.class_id);
+        const gradeMonthlyFee = studentClass ? (gradeFees[studentClass.grade_level] || 250) : 250;
+        
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden animate-scale-up text-right">
+              
+              {/* Header */}
+              <div className="bg-gradient-to-r from-[#0D5C8C] to-[#1A7FAA] p-4 text-white flex justify-between items-center">
+                <h3 className="font-bold text-sm flex items-center gap-1.5">
+                  <Coins className="w-4 h-4 text-amber-300" />
+                  <span>سداد فوري للطالب</span>
+                </h3>
+                <button 
+                  type="button" 
+                  onClick={() => setShowQuickPayModal(false)} 
+                  className="text-white/80 hover:text-white font-bold text-sm bg-black/10 hover:bg-black/20 px-2.5 py-0.5 rounded"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleQuickPaySubmit} className="p-5 space-y-4">
+                
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-150 space-y-2">
+                  <div className="text-slate-400 text-xxs font-bold uppercase">بيانات الطالب والمجموعة:</div>
+                  <div className="text-xs font-black text-slate-800">{quickPayStudent.name}</div>
+                  <div className="text-[10px] text-slate-500 font-sans">
+                    مجموعة: {studentClass?.name || 'غير محددة'} • رقم القيد: #{quickPayStudent.registration_id}
+                  </div>
+                </div>
+
+                {/* Sub-tabs to choose payment category */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">نوع التحصيل المالي:</label>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickPayCategory('tuition');
+                        setQuickPayAmount(gradeMonthlyFee);
+                      }}
+                      className={`py-2 text-xs font-bold rounded-md text-center transition-all cursor-pointer ${
+                        quickPayCategory === 'tuition'
+                          ? 'bg-white text-[#0D5C8C] shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      فلوس الشهر بالكامل 🗓️
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickPayCategory('sessions');
+                        const count = quickPaySessionCount === '' ? 0 : Number(quickPaySessionCount);
+                        const price = quickPaySessionPrice === '' ? 0 : Number(quickPaySessionPrice);
+                        setQuickPayAmount(count * price);
+                      }}
+                      className={`py-2 text-xs font-bold rounded-md text-center transition-all cursor-pointer ${
+                        quickPayCategory === 'sessions'
+                          ? 'bg-white text-[#0D5C8C] shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      بعدد الحصص فقط 🎯
+                    </button>
+                  </div>
+                </div>
+
+                {quickPayCategory === 'tuition' ? (
+                  <>
+                    <div className="text-xs font-bold text-[#0D5C8C] bg-blue-50/50 p-2.5 rounded-lg border border-blue-100 flex justify-between">
+                      <span>سداد اشتراك شهر: <span className="underline">{selectedMonth}</span></span>
+                      <span>القيمة التلقائية: {gradeMonthlyFee} ج.م</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-slate-700">قيمة الاشتراك المطلوب تحصيلها (ج.م) *</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={5000}
+                        value={quickPayAmount === '' ? '' : quickPayAmount}
+                        onChange={(e) => setQuickPayAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full text-xs font-sans font-extrabold border border-slate-300 px-3 py-2.5 rounded-lg text-[#0D5C8C] text-right focus:border-[#0D5C8C] focus:outline-hidden"
+                        required
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700">عدد حصص الحضور *</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={quickPaySessionCount === '' ? '' : quickPaySessionCount}
+                          onChange={(e) => setQuickPaySessionCount(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-full text-xs font-sans border border-slate-300 px-3 py-2 rounded-lg text-slate-800 text-right focus:border-[#0D5C8C] focus:outline-hidden"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700">سعر الحصة الواحدة *</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1000}
+                          value={quickPaySessionPrice === '' ? '' : quickPaySessionPrice}
+                          onChange={(e) => setQuickPaySessionPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-full text-xs font-sans border border-slate-300 px-3 py-2 rounded-lg text-slate-800 text-right focus:border-[#0D5C8C] focus:outline-hidden"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-indigo-50 border border-indigo-150 p-2.5 rounded-xl flex justify-between items-center text-xs text-indigo-900">
+                      <span className="font-bold">إجمالي المبلغ المحسوب:</span>
+                      <span className="font-black font-sans text-sm">{((quickPaySessionCount === '' ? 0 : Number(quickPaySessionCount)) * (quickPaySessionPrice === '' ? 0 : Number(quickPaySessionPrice))).toLocaleString()} ج.م</span>
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">طريقة التحصيل واستلام المال:</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setQuickPayMethod('cash')}
+                      className={`p-2.5 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                        quickPayMethod === 'cash'
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      نقدي 💵
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickPayMethod('card')}
+                      className={`p-2.5 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                        quickPayMethod === 'card'
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-800'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      فيزا POS 💳
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickPayMethod('transfer')}
+                      className={`p-2.5 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                        quickPayMethod === 'transfer'
+                          ? 'bg-amber-50 border-amber-500 text-amber-800'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Vodafone 📲
+                    </button>
+                  </div>
+                </div>
+
+                {/* SMS Notification simulation option */}
+                <div className="flex items-start gap-2 pt-1">
+                  <input
+                    id="sms_notify_parent"
+                    type="checkbox"
+                    checked={quickPayNotify}
+                    onChange={(e) => setQuickPayNotify(e.target.checked)}
+                    className="w-4 h-4 text-[#0D5C8C] border-slate-300 rounded focus:ring-[#0D5C8C] cursor-pointer mt-0.5"
+                  />
+                  <label htmlFor="sms_notify_parent" className="text-[10px] font-semibold text-slate-600 cursor-pointer select-none leading-normal">
+                    إرسال رسالة تأكيد الدفع لولي الأمر تلقائياً (صامتاً عبر بوابة الإشعارات) ✉️
+                  </label>
+                </div>
+
+                <div className="flex gap-2 border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickPayModal(false)}
+                    className="flex-1 py-2 text-xs border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 font-bold cursor-pointer"
+                  >
+                    إلغاء المعاملة
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
+                  >
+                    تأكيد التحصيل واستلام الإيصال ✓
+                  </button>
+                </div>
+
+              </form>
+
+            </div>
+          </div>
+        );
+      })()}
 
 
       {/* DIGITAL RECEIPT PRINT MODAL */}

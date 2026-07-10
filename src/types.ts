@@ -8,7 +8,9 @@ export interface Student {
   national_id?: string;
   name: string; // الاسم
   registration_id: string; // رقم القيد
-  class_id: string; // المجموعة
+  class_id: string; // المجموعة الأولى
+  class_id_2?: string; // المجموعة الثانية (اختياري)
+  class_ids?: string[]; // قائمة بكافة المجموعات التي يتبع لها الطالب (اختياري)
   grade_level: string; // السنة الدراسية (مثلاً: الصف الأول، الثاني، الثالث)
   birth_date: string; // تاريخ الميلاد
   phone: string; // الهاتف
@@ -133,8 +135,10 @@ export interface FeePayment {
   payment_method: 'cash' | 'card' | 'transfer'; // نقدي / بطاقة / تحويل
   term: 'first_term' | 'second_term' | 'full_year';
   receipt_number: string; // رقم الإيصال
-  category: 'tuition' | 'bus' | 'uniform' | 'activities'; // نوع الرسوم
+  category: 'tuition' | 'sessions' | 'bus' | 'uniform' | 'activities'; // نوع الرسوم
   month?: string; // الشهر المدفوع له الاشتراك (مثلاً: سبتمبر 2026)
+  session_count?: number; // عدد الحصص المحضورة
+  session_price?: number; // سعر الحصة الواحدة
 }
 
 export interface SystemNotification {

@@ -373,7 +373,14 @@ export default function BooksManager() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-600 block">سعر المذكرة <span className="text-rose-500">*</span></label>
                     <div className="relative">
-                      <input type="number" min="0" value={bookForm.price || ''} onChange={e => setBookForm({...bookForm, price: parseFloat(e.target.value) || 0})} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-[#1A7FAA]/30 outline-none" required />
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={bookForm.price === 0 ? '' : bookForm.price} 
+                        onChange={e => setBookForm({...bookForm, price: e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0)})} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-[#1A7FAA]/30 outline-none" 
+                        required 
+                      />
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">ج.م</span>
                     </div>
                   </div>
@@ -435,7 +442,14 @@ export default function BooksManager() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-600 block">المبلغ المدفوع <span className="text-rose-500">*</span></label>
                     <div className="relative">
-                      <input type="number" min="0" value={paymentForm.amount_paid === 0 && paymentForm.book_id === '' ? '' : paymentForm.amount_paid} onChange={e => setPaymentForm({...paymentForm, amount_paid: parseFloat(e.target.value) || 0})} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-[#1A7FAA]/30 outline-none" required />
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={paymentForm.amount_paid === 0 ? '' : paymentForm.amount_paid} 
+                        onChange={e => setPaymentForm({...paymentForm, amount_paid: e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0)})} 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-[#1A7FAA]/30 outline-none" 
+                        required 
+                      />
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">ج.م</span>
                     </div>
                   </div>

@@ -91,6 +91,44 @@ export default function AttendanceTracker() {
     return () => clearInterval(interval);
   }, []);
 
+  // Automatic Absence marking when the day has ended
+  useEffect(() => {
+    if (students.length === 0) return;
+
+    const today = new Date();
+    const offset = today.getTimezoneOffset();
+    const localToday = new Date(today.getTime() - (offset * 60 * 1000));
+    const todayStr = localToday.toISOString().split('T')[0];
+
+    // If the selected date is in the past (day has ended)
+    if (selectedDate < todayStr) {
+      const unmarkedStudents = students.filter(student => {
+        // Only active/suspended students
+        if (student.status === 'archived') return false;
+
+        // Filter by grade / class if selected
+        if (selectedGrade !== 'all' && student.grade_level !== selectedGrade) return false;
+        if (selectedClass !== 'all') {
+          const currentClassIds = student.class_ids || [student.class_id, student.class_id_2].filter(Boolean);
+          if (!currentClassIds.includes(selectedClass)) return false;
+        }
+
+        // Check if there is already an attendance record (present, absent, or excused)
+        const hasRecord = attendance.some(a => a.student_id === student.id && a.date === selectedDate);
+        return !hasRecord;
+      });
+
+      if (unmarkedStudents.length > 0) {
+        unmarkedStudents.forEach(s => {
+          const classToSave = selectedClass !== 'all' ? selectedClass : (s.class_id || 'default');
+          samsDb.saveAttendance(s.id, classToSave, selectedDate, 'absent');
+        });
+        loadData();
+        setSuccessMsg(`تنبيه: لقد انتهى هذا اليوم، وتم تسجيل غياب تلقائي لـ (${unmarkedStudents.length}) طالب لم يكونوا مسجلين.`);
+      }
+    }
+  }, [selectedDate, students, attendance, selectedClass, selectedGrade]);
+
 
   const processAttendance = (student: Student) => {
     // Check if they were absent last session
@@ -105,7 +143,8 @@ export default function AttendanceTracker() {
     }
 
     // Otherwise just save
-    samsDb.saveAttendance(student.id, student.class_id, selectedDate, 'present');
+    const targetClassId = (selectedClass !== 'all') ? selectedClass : student.class_id;
+    samsDb.saveAttendance(student.id, targetClassId, selectedDate, 'present');
     loadData();
     playSuccessBeep();
     setScanFeedback({ type: 'success', msg: `حضور: ${student.name}` });
@@ -174,7 +213,8 @@ export default function AttendanceTracker() {
   // Group Management logic
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
-      const matchesClass = selectedClass === 'all' || s.class_id === selectedClass;
+      const currentClassIds = s.class_ids || [s.class_id, s.class_id_2].filter(Boolean);
+      const matchesClass = selectedClass === 'all' || currentClassIds.includes(selectedClass);
       const matchesGrade = selectedGrade === 'all' || s.grade_level === selectedGrade;
       return matchesClass && matchesGrade;
     });
@@ -243,7 +283,8 @@ export default function AttendanceTracker() {
   const confirmAbsent = () => {
     if (showAbsentConfirm) {
       showAbsentConfirm.forEach(s => {
-        samsDb.saveAttendance(s.id, s.class_id, selectedDate, 'absent');
+        const attendanceClassId = (selectedClass !== 'all') ? selectedClass : s.class_id;
+        samsDb.saveAttendance(s.id, attendanceClassId, selectedDate, 'absent');
       });
       loadData();
       setSuccessMsg("تم تسجيل الغياب بنجاح.");
@@ -435,84 +476,174 @@ export default function AttendanceTracker() {
             </div>
           )}
 
-          {/* Students Table */}
-          <div className="flex-1 overflow-auto border border-slate-100 rounded-xl">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 shadow-sm">
-                <tr>
-                  <th className="px-4 py-3">الطالب</th>
-                  <th className="px-4 py-3">رقم القيد</th>
-                  {selectedGrade === 'all' && <th className="px-4 py-3">الصف</th>}
-                  {selectedClass === 'all' && <th className="px-4 py-3">المجموعة</th>}
-                  <th className="px-4 py-3 text-center">حالة اليوم</th>
-                  <th className="px-4 py-3 text-center">الدفع</th>
-                  <th className="px-4 py-3 text-center">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredStudents.length > 0 ? filteredStudents.map(student => {
-                  const studentAtt = attendance.find(a => a.student_id === student.id && a.date === selectedDate);
-                  const status = studentAtt ? studentAtt.status : 'pending';
-                  const classObj = classes.find(c => c.id === student.class_id);
-                  return (
-                    <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-slate-800">{student.name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500">{student.registration_id}</td>
-                      {selectedGrade === 'all' && (
-                        <td className="px-4 py-3 text-xs text-slate-600">{student.grade_level || '-'}</td>
-                      )}
-                      {selectedClass === 'all' && (
-                        <td className="px-4 py-3 text-xs text-slate-600">{classObj?.name || '-'}</td>
-                      )}
-                      <td className="px-4 py-3 text-center">
-                        {status === 'present' && <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md text-xs font-bold"><Check className="w-3.5 h-3.5" /> حاضر</span>}
-                        {status === 'absent' && <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-700 px-2.5 py-1 rounded-md text-xs font-bold"><X className="w-3.5 h-3.5" /> غائب</span>}
-                        {status === 'excused' && <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2.5 py-1 rounded-md text-xs font-bold">مستأذن</span>}
-                        {status === 'pending' && <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md text-xs font-bold">لم يُسجل</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {fees.some(f => f.student_id === student.id && f.category === 'tuition' && f.month === `${ARABIC_MONTHS[new Date(selectedDate).getMonth()]} ${new Date(selectedDate).getFullYear()}`) ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-xs font-bold"><Check className="w-3.5 h-3.5" /> مسدد</span>
-                        ) : (
-                            <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-xs font-bold"><X className="w-3.5 h-3.5" /> غير مسدد</span>
+          {/* Students list */}
+          <div className="flex-1 border border-slate-100 rounded-xl overflow-hidden bg-white">
+            {/* Desktop View Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm text-right">
+                <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 shadow-sm">
+                  <tr>
+                    <th className="px-4 py-3">الطالب</th>
+                    <th className="px-4 py-3">رقم القيد</th>
+                    {selectedGrade === 'all' && <th className="px-4 py-3">الصف</th>}
+                    {selectedClass === 'all' && <th className="px-4 py-3">المجموعة</th>}
+                    <th className="px-4 py-3 text-center">حالة اليوم</th>
+                    <th className="px-4 py-3 text-center">الدفع</th>
+                    <th className="px-4 py-3 text-center">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredStudents.length > 0 ? filteredStudents.map(student => {
+                    const studentAtt = attendance.find(a => a.student_id === student.id && a.date === selectedDate);
+                    const status = studentAtt ? studentAtt.status : 'pending';
+                    const classObj = classes.find(c => c.id === student.class_id);
+                    return (
+                      <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 font-bold text-slate-800">{student.name}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{student.registration_id}</td>
+                        {selectedGrade === 'all' && (
+                          <td className="px-4 py-3 text-xs text-slate-600">{student.grade_level || '-'}</td>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => handleMarkPresent(student)}
-                            className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${status === 'present' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
-                            title="تعيين حاضر"
-                          >
-                            حاضر
-                          </button>
-                          <button
-                            onClick={() => { samsDb.saveAttendance(student.id, student.class_id, selectedDate, 'absent'); loadData(); }}
-                            className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${status === 'absent' ? 'bg-rose-100 text-rose-700' : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'}`}
-                            title="تعيين غائب"
-                          >
-                            غائب
-                          </button>
-                          <button
-                            onClick={() => { samsDb.saveAttendance(student.id, student.class_id, selectedDate, 'excused'); loadData(); }}
-                            className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${status === 'excused' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'}`}
-                            title="تعيين مستأذن"
-                          >
-                            مستأذن
-                          </button>
-                        </div>
+                        {selectedClass === 'all' && (
+                          <td className="px-4 py-3 text-xs text-slate-600">{classObj?.name || '-'}</td>
+                        )}
+                        <td className="px-4 py-3 text-center">
+                          {status === 'present' && <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md text-xs font-bold"><Check className="w-3.5 h-3.5" /> حاضر</span>}
+                          {status === 'absent' && <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-700 px-2.5 py-1 rounded-md text-xs font-bold"><X className="w-3.5 h-3.5" /> غائب</span>}
+                          {status === 'excused' && <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2.5 py-1 rounded-md text-xs font-bold">مستأذن</span>}
+                          {status === 'pending' && <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md text-xs font-bold">لم يُسجل</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {fees.some(f => f.student_id === student.id && f.category === 'tuition' && f.month === `${ARABIC_MONTHS[new Date(selectedDate).getMonth()]} ${new Date(selectedDate).getFullYear()}`) ? (
+                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-xs font-bold"><Check className="w-3.5 h-3.5" /> مسدد</span>
+                          ) : (
+                              <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-xs font-bold"><X className="w-3.5 h-3.5" /> غير مسدد</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleMarkPresent(student)}
+                              className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${status === 'present' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                              title="تعيين حاضر"
+                            >
+                              حاضر
+                            </button>
+                            <button
+                              onClick={() => { samsDb.saveAttendance(student.id, selectedClass !== 'all' ? selectedClass : student.class_id, selectedDate, 'absent'); loadData(); }}
+                              className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${status === 'absent' ? 'bg-rose-100 text-rose-700' : 'text-slate-500 hover:text-rose-700 hover:bg-rose-50'}`}
+                              title="تعيين غائب"
+                            >
+                              غائب
+                            </button>
+                            <button
+                              onClick={() => { samsDb.saveAttendance(student.id, selectedClass !== 'all' ? selectedClass : student.class_id, selectedDate, 'excused'); loadData(); }}
+                              className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${status === 'excused' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50'}`}
+                              title="تعيين مستأذن"
+                            >
+                              مستأذن
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                        لا يوجد طلاب في هذه المجموعة
                       </td>
                     </tr>
-                  );
-                }) : (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
-                      لا يوجد طلاب في هذه المجموعة
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile View Card List */}
+            <div className="block md:hidden divide-y divide-slate-100">
+              {filteredStudents.length > 0 ? filteredStudents.map(student => {
+                const studentAtt = attendance.find(a => a.student_id === student.id && a.date === selectedDate);
+                const status = studentAtt ? studentAtt.status : 'pending';
+                const classObj = classes.find(c => c.id === student.class_id);
+                const isPaid = fees.some(f => f.student_id === student.id && f.category === 'tuition' && f.month === `${ARABIC_MONTHS[new Date(selectedDate).getMonth()]} ${new Date(selectedDate).getFullYear()}`);
+                
+                return (
+                  <div key={student.id} className="p-4 space-y-3 bg-white">
+                    {/* Header: Name, registration ID */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-xs">{student.name}</h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 py-0.2 rounded">
+                            #{student.registration_id}
+                          </span>
+                          {(selectedGrade === 'all' || selectedClass === 'all') && (
+                            <span className="text-[8px] font-bold text-sky-700 bg-sky-50 px-1 py-0.2 rounded border border-sky-100/40">
+                              {classObj?.name || student.grade_level || '-'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Today Status Badge */}
+                      <div>
+                        {status === 'present' && <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-emerald-100"><Check className="w-3 h-3 text-emerald-600" /> حاضر</span>}
+                        {status === 'absent' && <span className="inline-flex items-center gap-0.5 bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-100"><X className="w-3 h-3 text-rose-500" /> غائب</span>}
+                        {status === 'excused' && <span className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-100">مستأذن</span>}
+                        {status === 'pending' && <span className="inline-flex items-center gap-0.5 bg-slate-50 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-bold border border-slate-100">لم يُسجل</span>}
+                      </div>
+                    </div>
+
+                    {/* Status & Payment Row */}
+                    <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100/60 text-xxs">
+                      <span className="text-slate-400 font-bold">الحالة المالية لشهر الحضور:</span>
+                      {isPaid ? (
+                        <span className="inline-flex items-center gap-0.5 bg-emerald-100/50 text-emerald-800 px-2 py-0.5 rounded-md font-bold"><Check className="w-3 h-3 text-emerald-600 shrink-0" /> مسدد الرسوم</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 bg-rose-100/50 text-rose-800 px-2 py-0.5 rounded-md font-bold"><X className="w-3 h-3 text-rose-600 shrink-0" /> متأخر السداد</span>
+                      )}
+                    </div>
+
+                    {/* Active Controls: 3 Big Buttons */}
+                    <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-slate-100/50">
+                      <button
+                        onClick={() => handleMarkPresent(student)}
+                        className={`py-2 rounded-xl text-xxs font-extrabold border transition-all cursor-pointer text-center ${
+                          status === 'present'
+                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        حاضر ✓
+                      </button>
+                      <button
+                        onClick={() => { samsDb.saveAttendance(student.id, selectedClass !== 'all' ? selectedClass : student.class_id, selectedDate, 'absent'); loadData(); }}
+                        className={`py-2 rounded-xl text-xxs font-extrabold border transition-all cursor-pointer text-center ${
+                          status === 'absent'
+                            ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        غائب ✖
+                      </button>
+                      <button
+                        onClick={() => { samsDb.saveAttendance(student.id, selectedClass !== 'all' ? selectedClass : student.class_id, selectedDate, 'excused'); loadData(); }}
+                        className={`py-2 rounded-xl text-xxs font-extrabold border transition-all cursor-pointer text-center ${
+                          status === 'excused'
+                            ? 'bg-amber-500 border-amber-500 text-white shadow-xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        مستأذن
+                      </button>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="p-12 text-center text-slate-500">
+                  <span className="text-xs font-bold block">لا يوجد طلاب في هذه المجموعة</span>
+                </div>
+              )}
+            </div>
           </div>
 
         </div>

@@ -173,7 +173,10 @@ export default function ExamsAndAssignments() {
       return;
     }
 
-    const groupStudents = students.filter(s => s.class_id === selectedClassId);
+    const groupStudents = students.filter(student => {
+      const currentClassIds = student.class_ids || [student.class_id, student.class_id_2].filter(Boolean);
+      return currentClassIds.includes(selectedClassId);
+    });
     const initialTemp: Record<string, { score: number; flag: boolean; notes: string }> = {};
     let hasSavedGrades = false;
 
@@ -419,7 +422,7 @@ export default function ExamsAndAssignments() {
     let hasValidationError = false;
 
     // First validate scores
-    const groupStudents = students.filter(s => s.class_id === selectedClassId);
+    const groupStudents = students.filter(s => s.class_id === selectedClassId || s.class_id_2 === selectedClassId);
     for (const student of groupStudents) {
       const entry = tempGrades[student.id];
       if (entry) {
@@ -484,9 +487,9 @@ export default function ExamsAndAssignments() {
   };
 
   // Student list inside the active class
-  const activeClassStudents = useMemo(() => {
-    return students.filter(s => s.class_id === selectedClassId);
-  }, [students, selectedClassId]);
+    const activeClassStudents = useMemo(() => {
+      return students.filter(s => s.class_id === selectedClassId || s.class_id_2 === selectedClassId);
+    }, [students, selectedClassId]);
 
   // Exam list search filter
   const filteredExams = useMemo(() => {
@@ -1157,8 +1160,8 @@ export default function ExamsAndAssignments() {
                     type="number"
                     min={1}
                     max={100}
-                    value={examForm.max_score}
-                    onChange={(e) => setExamForm({ ...examForm, max_score: Number(e.target.value) })}
+                    value={examForm.max_score === 0 ? '' : examForm.max_score}
+                    onChange={(e) => setExamForm({ ...examForm, max_score: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full text-center border border-slate-200 rounded-xl p-2.5 font-mono font-bold text-xs"
                   />
                 </div>
@@ -1170,8 +1173,8 @@ export default function ExamsAndAssignments() {
                     type="number"
                     min={5}
                     max={180}
-                    value={examForm.duration_mins}
-                    onChange={(e) => setExamForm({ ...examForm, duration_mins: Number(e.target.value) })}
+                    value={examForm.duration_mins === 0 ? '' : examForm.duration_mins}
+                    onChange={(e) => setExamForm({ ...examForm, duration_mins: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full text-center border border-slate-200 rounded-xl p-2.5 font-mono font-bold text-xs"
                   />
                 </div>
@@ -1419,8 +1422,8 @@ export default function ExamsAndAssignments() {
                     type="number"
                     min={1}
                     max={100}
-                    value={assignmentForm.max_score}
-                    onChange={(e) => setAssignmentForm({ ...assignmentForm, max_score: Number(e.target.value) })}
+                    value={assignmentForm.max_score === 0 ? '' : assignmentForm.max_score}
+                    onChange={(e) => setAssignmentForm({ ...assignmentForm, max_score: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full text-center border border-slate-200 rounded-xl p-2.5 font-mono font-bold text-xs"
                   />
                 </div>

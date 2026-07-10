@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Student, Attendance, ExamGrade, Exam, AssignmentGrade, Assignment, FeePayment, ClassRoom } from '../types';
-import { samsDb } from '../utils/db';
+import { samsDb, getTenantSetting } from '../utils/db';
 import { X, Printer, Download, User, Calendar, BookOpen, CreditCard, CheckCircle, AlertCircle, Award, Target, Hash, Phone, Clock } from 'lucide-react';
 
 interface Props {
@@ -10,16 +10,22 @@ interface Props {
 }
 
 export default function StudentFullReport({ student, onClose }: Props) {
+  const classesList = samsDb.getClasses();
+  const currentClassIds = student.class_ids || [student.class_id, student.class_id_2].filter(Boolean);
+  const studentClasses = currentClassIds.map(id => classesList.find(c => c.id === id)).filter(Boolean);
+
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [examGrades, setExamGrades] = useState<(ExamGrade & { exam: Exam })[]>([]);
   const [assignmentGrades, setAssignmentGrades] = useState<(AssignmentGrade & { assignment: Assignment })[]>([]);
   const [fees, setFees] = useState<FeePayment[]>([]);
   const [classInfo, setClassInfo] = useState<ClassRoom | null>(null);
+  const [classInfo2, setClassInfo2] = useState<ClassRoom | null>(null);
 
   useEffect(() => {
     // Load class info
     const classes = samsDb.getClasses();
     setClassInfo(classes.find(c => c.id === student.class_id) || null);
+    setClassInfo2(classes.find(c => c.id === student.class_id_2) || null);
 
     // Load attendance
     const allAtt = samsDb.getAttendance();
@@ -57,7 +63,468 @@ export default function StudentFullReport({ student, onClose }: Props) {
   }, [student.id, student.class_id]);
 
   const handlePrint = () => {
-    window.print();
+    const sysName = getTenantSetting('sams_custom_app_name_v2', 'Fox System');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    // Compile sections
+    // Attendance list
+    const attendanceRows = attendance.map(att => {
+      const dateStr = new Date(att.date).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const statusText = att.status === 'present' ? 'حاضر' : att.status === 'absent' ? 'غائب' : 'مستأذن';
+      const statusClass = att.status === 'present' ? 'status-present' : att.status === 'absent' ? 'status-absent' : 'status-excused';
+      return `<tr>
+        <td>${dateStr}</td>
+        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Exams
+    const examRows = examGrades.map(eg => {
+      const dateStr = new Date(eg.exam.date).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const scoreStr = eg.absent ? 'غائب' : `${eg.score} / ${eg.exam.max_score}`;
+      const pct = eg.absent ? 0 : Math.round((eg.score / eg.exam.max_score) * 100);
+      const gradeClass = eg.absent ? 'status-absent' : (pct >= 85 ? 'status-present' : pct >= 50 ? 'status-excused' : 'status-absent');
+      return `<tr>
+        <td>${eg.exam.name}</td>
+        <td>${dateStr}</td>
+        <td>${eg.exam.type}</td>
+        <td><span class="status-badge ${gradeClass}">${scoreStr}</span></td>
+        <td>${eg.teacher_notes || '-'}</td>
+      </tr>`;
+    }).join('');
+
+    // Assignments
+    const assignmentRows = assignmentGrades.map(ag => {
+      const dateStr = new Date(ag.assignment.due_date).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const statusText = ag.completed ? `تم التسليم (${ag.score} / ${ag.assignment.max_score})` : 'لم يتم التسليم';
+      const statusClass = ag.completed ? 'status-present' : 'status-absent';
+      return `<tr>
+        <td>${ag.assignment.title}</td>
+        <td>${dateStr}</td>
+        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Fees
+    const feeRows = fees.map(fee => {
+      const dateStr = new Date(fee.payment_date).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const catText = fee.category === 'tuition' ? 'مصروفات دراسية' : fee.category === 'bus' ? 'اشتراك باص' : fee.category === 'uniform' ? 'زي مدرسي' : 'أنشطة';
+      const methodText = fee.payment_method === 'cash' ? 'نقدي' : fee.payment_method === 'card' ? 'فيزا' : 'تحويل';
+      return `<tr>
+        <td>${dateStr}</td>
+        <td class="font-bold text-amber-700" style="font-weight: bold; color: #b45309;">${fee.amount} ج.م</td>
+        <td>${catText}</td>
+        <td>${fee.month || '-'}</td>
+        <td>${fee.receipt_number || '-'}</td>
+        <td>${methodText}</td>
+      </tr>`;
+    }).join('');
+
+    const style = `
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+        
+        * {
+          box-sizing: border-box;
+          font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+          direction: rtl;
+        }
+        
+        body {
+          margin: 0;
+          padding: 30px;
+          background: white;
+          color: #1e293b;
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        /* Header Style */
+        .report-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 3px double #cbd5e1;
+          padding-bottom: 15px;
+          margin-bottom: 25px;
+        }
+
+        .header-title h1 {
+          font-size: 22px;
+          font-weight: 800;
+          color: #0f172a;
+          margin: 0 0 5px 0;
+        }
+
+        .header-title p {
+          font-size: 12px;
+          color: #64748b;
+          margin: 0;
+          font-weight: 600;
+        }
+
+        .system-branding {
+          text-align: left;
+        }
+
+        .system-branding h2 {
+          font-size: 18px;
+          font-weight: 800;
+          color: #1a7faa;
+          margin: 0 0 5px 0;
+        }
+
+        .system-branding p {
+          font-size: 11px;
+          color: #94a3b8;
+          margin: 0;
+        }
+
+        /* Profile & Stats grid */
+        .grid-container {
+          display: grid;
+          grid-template-columns: 1.2fr 2fr;
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+
+        .profile-card {
+          border: 1px solid #cbd5e1;
+          border-radius: 12px;
+          padding: 15px;
+          background-color: #f8fafc;
+        }
+
+        .profile-card h3 {
+          font-size: 14px;
+          font-weight: 700;
+          margin-top: 0;
+          margin-bottom: 12px;
+          color: #334155;
+          border-bottom: 1px solid #cbd5e1;
+          padding-bottom: 8px;
+        }
+
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 6px 0;
+          border-bottom: 1px dashed #e2e8f0;
+        }
+
+        .info-row:last-child {
+          border-bottom: none;
+        }
+
+        .info-label {
+          color: #64748b;
+          font-weight: 600;
+        }
+
+        .info-value {
+          color: #1e293b;
+          font-weight: 700;
+        }
+
+        /* Stats Blocks */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 15px;
+        }
+
+        .stat-box {
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 15px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        .stat-box.present { background-color: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+        .stat-box.fees { background-color: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .stat-box.exams { background-color: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
+        .stat-box.assignments { background-color: #f0f9ff; border-color: #bae6fd; color: #075985; }
+
+        .stat-title {
+          font-size: 12px;
+          font-weight: 700;
+          margin-bottom: 5px;
+        }
+
+        .stat-value {
+          font-size: 24px;
+          font-weight: 800;
+          margin: 0;
+        }
+
+        .stat-desc {
+          font-size: 11px;
+          margin-top: 4px;
+          opacity: 0.8;
+          font-weight: 600;
+        }
+
+        /* Sections */
+        .section-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #0f172a;
+          margin-top: 25px;
+          margin-bottom: 12px;
+          border-right: 4px solid #1a7faa;
+          padding-right: 10px;
+        }
+
+        /* Tables */
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+        }
+
+        th {
+          background-color: #f1f5f9;
+          color: #475569;
+          font-weight: 700;
+          text-align: right;
+          padding: 8px 12px;
+          border: 1px solid #cbd5e1;
+          font-size: 11px;
+        }
+
+        td {
+          padding: 8px 12px;
+          border: 1px solid #cbd5e1;
+          color: #334155;
+          font-size: 12px;
+        }
+
+        tr:nth-child(even) td {
+          background-color: #f8fafc;
+        }
+
+        /* Attendance grid for print */
+        .attendance-grid {
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 8px;
+          margin-bottom: 25px;
+        }
+
+        .attendance-item {
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          padding: 8px;
+          text-align: center;
+          font-size: 11px;
+        }
+
+        .attendance-item.present { background-color: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+        .attendance-item.absent { background-color: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+        .attendance-item.excused { background-color: #fffbeb; border-color: #fde68a; color: #92400e; }
+
+        .attendance-date {
+          font-weight: 700;
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        /* Badges */
+        .status-badge {
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .status-badge.status-present { background-color: #dcfce7; color: #15803d; }
+        .status-badge.status-absent { background-color: #fee2e2; color: #b91c1c; }
+        .status-badge.status-excused { background-color: #fef3c7; color: #b45309; }
+
+        /* Print optimization */
+        @media print {
+          body {
+            padding: 0;
+            font-size: 12px;
+          }
+          
+          .no-print {
+            display: none !important;
+          }
+
+          tr {
+            page-break-inside: avoid;
+          }
+
+          .section-title {
+            page-break-after: avoid;
+          }
+        }
+      </style>
+    `;
+
+    // attendance items
+    let attendanceItemsHtml = '';
+    if (attendance.length > 0) {
+      attendanceItemsHtml = `<div class="attendance-grid">` + attendance.map(att => {
+        const dateStr = new Date(att.date).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' });
+        const statusText = att.status === 'present' ? 'حاضر' : att.status === 'absent' ? 'غائب' : 'مستأذن';
+        const itemClass = att.status === 'present' ? 'present' : att.status === 'absent' ? 'absent' : 'excused';
+        return `<div class="attendance-item ${itemClass}">
+          <span class="attendance-date">${dateStr}</span>
+          <strong>${statusText}</strong>
+        </div>`;
+      }).join('') + `</div>`;
+    } else {
+      attendanceItemsHtml = `<p style="font-style: italic; color: #64748b; padding: 10px; background: #f8fafc; border-radius: 8px;">لا توجد سجلات حضور مسجلة لهذا الطالب.</p>`;
+    }
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html lang="ar">
+      <head>
+        <meta charset="UTF-8">
+        <title>تقرير الطالب الشامل - ${student.name}</title>
+        ${style}
+      </head>
+      <body>
+        <!-- Report Header -->
+        <div class="report-header">
+          <div class="header-title">
+            <h1>التقرير الأكاديمي والمالي الشامل للطالب</h1>
+            <p>تاريخ إصدار التقرير: ${new Date().toLocaleDateString('ar-EG')} - الوقت: ${new Date().toLocaleTimeString('ar-EG')}</p>
+          </div>
+          <div class="system-branding">
+            <h2>${sysName}</h2>
+            <p>لإدارة ومتابعة السناتر التعليمية</p>
+          </div>
+        </div>
+
+        <!-- Grid with Profile & Stats -->
+        <div class="grid-container">
+          <!-- Profile info -->
+          <div class="profile-card">
+            <h3>البيانات الأساسية</h3>
+            <div class="info-row"><span class="info-label">اسم الطالب:</span><span class="info-value">${student.name}</span></div>
+            <div class="info-row"><span class="info-label">رقم القيد:</span><span class="info-value font-mono">${student.registration_id}</span></div>
+            ${student.barcode ? `<div class="info-row"><span class="info-label">الباركود:</span><span class="info-value font-mono">${student.barcode}</span></div>` : ''}
+            <div class="info-row"><span class="info-label">المجموعات الدراسية:</span><span class="info-value">${studentClasses.map(c => c.name).join(' ، ') || '-'}</span></div>
+            <div class="info-row"><span class="info-label">السنة الدراسية:</span><span class="info-value">${student.grade_level}</span></div>
+            <div class="info-row"><span class="info-label">ولي الأمر:</span><span class="info-value">${student.parent_name || 'غير مدون'}</span></div>
+            <div class="info-row"><span class="info-label">هاتف ولي الأمر:</span><span class="info-value font-mono">${student.parent_phone || '-'}</span></div>
+            ${student.notes ? `<div style="margin-top: 10px; font-size: 11px; background: #fffbeb; padding: 8px; border-radius: 6px; border: 1px solid #fef3c7;"><strong>ملاحظات الكتب/المذكرات:</strong><br>${student.notes}</div>` : ''}
+          </div>
+
+          <!-- Quick statistics -->
+          <div class="stats-grid">
+            <div class="stat-box present">
+              <p class="stat-title">نسبة الحضور والالتزام</p>
+              <h4 class="stat-value">${attRate}%</h4>
+              <p class="stat-desc">حاضر: ${attPresent} | غائب: ${attAbsent} | مستأذن: ${attExcused}</p>
+            </div>
+            
+            <div class="stat-box fees">
+              <p class="stat-title">إجمالي المصاريف والمدفوعات</p>
+              <h4 class="stat-value">${totalFeesPaid} ج.م</h4>
+              <p class="stat-desc">تم سدادها في السجل المالي</p>
+            </div>
+
+            <div class="stat-box exams">
+              <p class="stat-title">الامتحانات والتقييمات</p>
+              <h4 class="stat-value">${examGrades.length} امتحان</h4>
+              <p class="stat-desc">تم تسجيل درجات لها</p>
+            </div>
+
+            <div class="stat-box assignments">
+              <p class="stat-title">نسبة تسليم الواجبات</p>
+              <h4 class="stat-value">${assignmentGrades.length > 0 ? Math.round((assignmentGrades.filter(a => a.completed).length / assignmentGrades.length)*100) : 0}%</h4>
+              <p class="stat-desc">إجمالي التكليفات: ${assignmentGrades.length}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Attendance -->
+        <div class="section-title">سجل الحضور والغياب المفصل</div>
+        ${attendanceItemsHtml}
+
+        <!-- Section: Exams -->
+        <div class="section-title">سجل درجات الامتحانات والتقييمات</div>
+        ${examGrades.length > 0 ? `
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الامتحان/الاختبار</th>
+                <th>التاريخ</th>
+                <th>نوع الامتحان</th>
+                <th>الدرجة المسجلة</th>
+                <th>ملاحظات المعلم</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${examRows}
+            </tbody>
+          </table>
+        ` : `<p style="font-style: italic; color: #64748b; padding: 10px; background: #f8fafc; border-radius: 8px;">لا توجد اختبارات مسجلة.</p>`}
+
+        <!-- Section: Assignments -->
+        <div class="section-title">سجل تسليم الواجبات والتكليفات</div>
+        ${assignmentGrades.length > 0 ? `
+          <table>
+            <thead>
+              <tr>
+                <th>عنوان التكليف / الواجب</th>
+                <th>تاريخ الاستحقاق</th>
+                <th>حالة التسليم والدرجة</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${assignmentRows}
+            </tbody>
+          </table>
+        ` : `<p style="font-style: italic; color: #64748b; padding: 10px; background: #f8fafc; border-radius: 8px;">لا توجد تكليفات مسجلة.</p>`}
+
+        <!-- Section: Fees -->
+        <div class="section-title">سجل المدفوعات والوصولات المالية</div>
+        ${fees.length > 0 ? `
+          <table>
+            <thead>
+              <tr>
+                <th>تاريخ الدفع</th>
+                <th>المبلغ المسدد</th>
+                <th>النوع / الفئة</th>
+                <th>البيان / الشهر</th>
+                <th>رقم الإيصال</th>
+                <th>طريقة السداد</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${feeRows}
+            </tbody>
+          </table>
+        ` : `<p style="font-style: italic; color: #64748b; padding: 10px; background: #f8fafc; border-radius: 8px;">لا توجد وصولات مالية مسجلة.</p>`}
+
+        <!-- Footer -->
+        <div style="margin-top: 40px; border-top: 1px solid #cbd5e1; padding-top: 15px; text-align: center; font-size: 11px; color: #94a3b8;">
+          تم إنشاء هذا التقرير تلقائياً بواسطة نظام إدارة السناتر التعليمية ${sysName} • جميع الحقوق محفوظة
+        </div>
+
+        <script>
+          window.focus();
+          setTimeout(function() {
+            window.print();
+            window.close();
+          }, 350);
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
   };
 
   const attPresent = attendance.filter(a => a.status === 'present').length;
@@ -69,15 +536,16 @@ export default function StudentFullReport({ student, onClose }: Props) {
   const totalFeesPaid = fees.reduce((sum, f) => sum + f.amount, 0);
 
   return (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100] print:p-0 print:bg-white print:block" dir="rtl">
+    <div id="sams-student-report-modal-parent" className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100]" dir="rtl">
       <motion.div
+        id="sams-student-report-modal-content"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col print:shadow-none print:max-w-full print:h-auto print:max-h-none print:overflow-visible"
+        className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0 print:bg-white print:border-slate-300">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-[#1A7FAA]/10 text-[#1A7FAA] rounded-xl flex items-center justify-center border border-[#1A7FAA]/20">
               <User className="w-7 h-7" />
@@ -100,7 +568,7 @@ export default function StudentFullReport({ student, onClose }: Props) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar print:p-4 print:space-y-6">
+        <div id="sams-student-report-scroll-container" className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar print:p-4 print:space-y-6">
           
           {/* Section 1: Personal Info & Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -114,7 +582,17 @@ export default function StudentFullReport({ student, onClose }: Props) {
                 <div className="flex justify-between items-center"><span className="text-slate-500">اسم الطالب</span><span className="font-bold text-slate-800">{student.name}</span></div>
                 <div className="flex justify-between items-center"><span className="text-slate-500">رقم القيد</span><span className="font-mono text-slate-700">{student.registration_id}</span></div>
                 {student.barcode && <div className="flex justify-between items-center"><span className="text-slate-500">باركود الطالب</span><span className="font-mono text-slate-700">{student.barcode}</span></div>}
-                <div className="flex justify-between items-center"><span className="text-slate-500">المجموعة</span><span className="font-bold text-[#1A7FAA]">{classInfo?.name || '-'}</span></div>
+                <div className="flex flex-col gap-1.5 pt-2 pb-2 border-y border-slate-100">
+                  <span className="text-slate-500 text-xs font-bold block">المجموعات الدراسية المسجل بها</span>
+                  <div className="flex flex-wrap gap-1">
+                    {studentClasses.map(c => (
+                      <span key={c.id} className="inline-flex items-center px-2 py-0.5 bg-sky-50 text-[#0D5C8C] rounded-lg text-xs font-black border border-sky-100">
+                        {c.name}
+                      </span>
+                    ))}
+                    {studentClasses.length === 0 && <span className="text-slate-400 text-xs">غير مسجل بمجموعة</span>}
+                  </div>
+                </div>
                 <div className="flex justify-between items-center"><span className="text-slate-500">السنة الدراسية</span><span className="font-bold text-slate-700">{student.grade_level}</span></div>
                 <div className="flex justify-between items-center"><span className="text-slate-500">تاريخ التسجيل</span><span className="text-slate-700">{new Date(student.created_at).toLocaleDateString('ar-EG')}</span></div>
                 <div className="flex justify-between items-center pt-2 border-t border-slate-50">

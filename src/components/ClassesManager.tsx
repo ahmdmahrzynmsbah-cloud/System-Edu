@@ -163,7 +163,9 @@ export default function ClassesManager() {
                 {classStudents.length === 0 ? (
                     <div className="text-center p-12 text-slate-400 font-medium">لا يوجد طلاب مسجلين في هذه المجموعة حتى الآن.</div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div>
+                      {/* Desktop View Table */}
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-right">
                             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-sm">
                                 <tr>
@@ -210,6 +212,53 @@ export default function ClassesManager() {
                                 ))}
                             </tbody>
                         </table>
+                      </div>
+
+                      {/* Mobile View Card List */}
+                      <div className="block md:hidden divide-y divide-slate-150">
+                        {classStudents.map(student => (
+                          <div key={student.id} className="p-4 space-y-3 bg-white">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-[#0D5C8C] flex items-center justify-center font-bold text-xs">
+                                  {student.name.charAt(0)}
+                                </div>
+                                <span className="font-bold text-xs text-slate-800">{student.name}</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
+                                #{student.registration_id}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-xxs bg-slate-50 p-2.5 rounded-xl border border-slate-100/70">
+                              <div>
+                                <span className="text-slate-400 block text-[8px] font-bold mb-0.5">رقم الهاتف</span>
+                                <span className="font-mono text-slate-700 block text-xs" dir="ltr">{student.phone || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[8px] font-bold mb-0.5">حالة الطالب</span>
+                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  student.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 
+                                  student.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                  {student.status === 'active' ? 'نشط' : student.status === 'suspended' ? 'موقوف' : 'مؤجل'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end pt-1.5 border-t border-slate-100/50">
+                              <button
+                                onClick={() => setSelectedStudentDetails(student)}
+                                className="px-3 py-1.5 bg-slate-50 hover:bg-sky-50 text-[#0D5C8C] border border-slate-150 rounded-lg font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                                title="عرض تفاصيل الطالب"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>عرض كامل السجل</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                 )}
             </div>

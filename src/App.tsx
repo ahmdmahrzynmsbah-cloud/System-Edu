@@ -55,7 +55,8 @@ import ExamsAndAssignments from './components/ExamsAndAssignments';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import AnnouncementsManager from './components/AnnouncementsManager';
-import { Settings, Search, ShieldCheck } from 'lucide-react';
+import SmartAnalytics from './components/SmartAnalytics';
+import { Settings, Search, ShieldCheck, TrendingUp } from 'lucide-react';
 import { AdminNotification } from './types';
 import { Bell, CheckCheck, Trash2, Sun, Moon } from 'lucide-react';
 
@@ -64,7 +65,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { samsDb, getTenantSetting, saveToStorage } from './utils/db';
 import { subscribeToTenants } from './lib/tenantsApi';
 
-type TabType = 'dashboard' | 'students' | 'parents' | 'barcodes' | 'classes' | 'attendance' | 'fees' | 'notifications' | 'roles' | 'audit' | 'settings' | 'exams' | 'salaries' | 'privacy' | 'books' | 'announcements';
+type TabType = 'dashboard' | 'analytics' | 'students' | 'parents' | 'barcodes' | 'classes' | 'attendance' | 'fees' | 'notifications' | 'roles' | 'audit' | 'settings' | 'exams' | 'salaries' | 'privacy' | 'books' | 'announcements';
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -466,6 +467,7 @@ export default function App() {
 
   const navCategories = [
     { id: 'dashboard', label: 'لوحة التحكم والمؤشرات', icon: <LayoutDashboard className="w-4 h-4" />, roles: ['teacher'] },
+    { id: 'analytics', label: 'اتخاذ القرار والتحليلات الذكية', icon: <TrendingUp className="w-4 h-4" />, roles: ['teacher'] },
     {
       id: 'students_group',
       label: 'شؤون الطلاب',
@@ -552,7 +554,7 @@ export default function App() {
           const tenants = JSON.parse(savedTenants);
           const currentTenant = tenants.find((t: any) => t.id === tenantId);
           if (currentTenant && currentTenant.features) {
-            const allowedIds = [...currentTenant.features, 'privacy', 'books', 'settings'];
+            const allowedIds = [...currentTenant.features, 'privacy', 'books', 'settings', 'analytics'];
             return baseItems.filter(item => allowedIds.includes(item.id));
           }
         }
@@ -1080,7 +1082,8 @@ export default function App() {
         <main className="flex-1 p-6 overflow-y-auto no-scrollbar w-full space-y-6">
           <div className="max-w-7xl mx-auto">
             {activeTab === 'dashboard' && <Dashboard onNavigateToTab={(tab) => { setActiveTab(tab as TabType); }} />}
-            {activeTab === 'students' && <StudentsList />}
+            {activeTab === 'analytics' && <SmartAnalytics />}
+            {activeTab === 'students' && <StudentsList userRole={currentUserRole} />}
             {activeTab === 'parents' && <ParentsList />}
             {activeTab === 'books' && <BooksManager />}
             {activeTab === 'barcodes' && <StudentBarcodes />}

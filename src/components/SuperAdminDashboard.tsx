@@ -1,5 +1,5 @@
 import { db } from "../lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, query } from "firebase/firestore";
 import { getAllTenants, saveTenant, deleteTenant, subscribeToTenants } from "../lib/tenantsApi";
 import { samsDb } from "../utils/db";
 import AnnouncementsManager from "./AnnouncementsManager";
@@ -84,6 +84,13 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  
+  // State for Database Wipe Confirm Modal with Teacher Password Requirement
+  const [showWipeModal, setShowWipeModal] = useState(false);
+  const [wipeTenant, setWipeTenant] = useState<Tenant | null>(null);
+  const [wipePassword, setWipePassword] = useState('');
+  const [wipeError, setWipeError] = useState('');
+  const [isWiping, setIsWiping] = useState(false);
   
   // Database scan states
   const [databaseStats, setDatabaseStats] = useState<Record<string, { studentsCount: number, feesCount: number, secretariesCount: number, keysCount: number, sizeBytes: number }>>({});
@@ -313,17 +320,29 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
     return () => { if (unsubscribe) unsubscribe(); }
   }, []);
 
-  // Scan localStorage to calculate actual size and record count for each teacher
-  const scanDatabaseIsolation = (currentTenants: Tenant[]) => {
+  // Scan Firestore and localStorage to calculate actual size and record count for each teacher accurately
+  const scanDatabaseIsolation = async (currentTenants: Tenant[]) => {
     setIsScanningDb(true);
     const stats: Record<string, { studentsCount: number, feesCount: number, secretariesCount: number, keysCount: number, sizeBytes: number }> = {};
     
+    // Initialize with defaults
+    currentTenants.forEach(tenant => {
+      stats[tenant.id] = {
+        studentsCount: 0,
+        feesCount: 0,
+        secretariesCount: 1,
+        keysCount: 0,
+        sizeBytes: 0
+      };
+    });
+
+    // 1. Scan localStorage baseline
     currentTenants.forEach(tenant => {
       let keysCount = 0;
       let totalSize = 0;
       let studentsCount = 0;
       let feesCount = 0;
-      let secretariesCount = 1; // default to 1 (أ. سارة علي)
+      let secretariesCount = 1;
       const prefix = `${tenant.id}_`;
 
       for (let i = 0; i < localStorage.length; i++) {
@@ -331,7 +350,10 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
         if (key && key.startsWith(prefix)) {
           keysCount++;
           const val = localStorage.getItem(key) || '';
-          totalSize += val.length * 2; // approximation for utf-16 string size
+          
+          // Calculate precise UTF-8 byte size
+          const bytesSize = new Blob([key + val]).size;
+          totalSize += bytesSize;
 
           if (key.endsWith('sams_v2_students')) {
             try { studentsCount = JSON.parse(val).length; } catch(e){}
@@ -357,10 +379,84 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       };
     });
 
+    // 2. Scan cloud Firestore system_tenant_data for real-time accurate database sizes
+    try {
+      const tenantDataRef = collection(db, 'system_tenant_data');
+      const querySnapshot = await getDocs(query(tenantDataRef));
+      
+      const fsDocsByTenant: Record<string, Array<{ key: string, data: string, docId: string }>> = {};
+      querySnapshot.forEach(docSnap => {
+        const docData = docSnap.data();
+        const docId = docSnap.id;
+        
+        const matchedTenant = currentTenants.find(t => docId.startsWith(`${t.id}_`));
+        if (matchedTenant) {
+          const tenantId = matchedTenant.id;
+          if (!fsDocsByTenant[tenantId]) {
+            fsDocsByTenant[tenantId] = [];
+          }
+          fsDocsByTenant[tenantId].push({
+            key: docData.key || docId.substring(tenantId.length + 1),
+            data: docData.data || '',
+            docId
+          });
+        }
+      });
+
+      // Merge Cloud values to stats
+      currentTenants.forEach(tenant => {
+        const fsDocs = fsDocsByTenant[tenant.id];
+        if (fsDocs && fsDocs.length > 0) {
+          let totalCloudSize = 0;
+          let studentsCount = stats[tenant.id].studentsCount;
+          let feesCount = stats[tenant.id].feesCount;
+          let secretariesCount = stats[tenant.id].secretariesCount;
+          const mergedKeysSet = new Set<string>();
+
+          // Add local keys to mergedSet
+          const prefix = `${tenant.id}_`;
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(prefix)) {
+              mergedKeysSet.add(key.substring(prefix.length));
+            }
+          }
+
+          fsDocs.forEach(docObj => {
+            mergedKeysSet.add(docObj.key);
+            const bytesSize = new Blob([docObj.docId + docObj.data]).size;
+            totalCloudSize += bytesSize;
+
+            if (docObj.key === 'sams_v2_students') {
+              try { studentsCount = Math.max(studentsCount, JSON.parse(docObj.data).length); } catch(e){}
+            }
+            if (docObj.key === 'sams_v2_fees') {
+              try { feesCount = Math.max(feesCount, JSON.parse(docObj.data).length); } catch(e){}
+            }
+            if (docObj.key === 'sams_system_users') {
+              try {
+                const usersList = JSON.parse(docObj.data);
+                const count = usersList.filter((u: any) => u.role === 'secretary').length;
+                secretariesCount = Math.max(secretariesCount, count);
+              } catch(e){}
+            }
+          });
+
+          stats[tenant.id] = {
+            studentsCount,
+            feesCount,
+            secretariesCount,
+            keysCount: mergedKeysSet.size,
+            sizeBytes: Math.max(stats[tenant.id].sizeBytes, totalCloudSize)
+          };
+        }
+      });
+    } catch (err) {
+      console.error("Firestore scanning failed, fallback to localStorage stats:", err);
+    }
+
     setDatabaseStats(stats);
-    setTimeout(() => {
-      setIsScanningDb(false);
-    }, 400);
+    setIsScanningDb(false);
   };
 
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -578,72 +674,209 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
   };
 
   const handleWipeDatabase = (tenantId: string, name: string) => {
-    if (window.confirm(`⚠️ تصفير قاعدة البيانات: هل تريد مسح كافة السجلات وعمل فورمات لقاعدة بيانات المعلم (${name}) والبدء على بياض؟ طلابه وعملياته ستضيع بالكامل!`)) {
-      const prefix = `${tenantId}_`;
-      
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(prefix)) {
-          keysToRemove.push(key);
-        }
-      }
-      
-      keysToRemove.forEach(key => localStorage.removeItem(key));
+    const tenantObj = tenants.find(t => t.id === tenantId);
+    if (!tenantObj) return;
+    setWipeTenant(tenantObj);
+    setWipePassword('');
+    setWipeError('');
+    setShowWipeModal(true);
+  };
 
+  const handleConfirmWipe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!wipeTenant) return;
+
+    if (wipePassword !== wipeTenant.password) {
+      setWipeError('كلمة المرور غير صحيحة! يرجى إدخال كلمة المرور الخاصة بالمعلم لإتمام التصفير.');
+      return;
+    }
+
+    setIsWiping(true);
+    setWipeError('');
+
+    try {
+      const prefix = `${wipeTenant.id}_`;
+      const keys = [
+        'sams_v2_students', 'sams_v2_teachers', 'sams_v2_classes', 'sams_v2_fees', 
+        'sams_v2_attendance', 'sams_v2_exams', 'sams_v2_assignments', 
+        'sams_v2_exam_grades', 'sams_v2_assignment_grades', 'sams_v2_subjects', 
+        'sams_v2_grades', 'sams_v2_notifications', 'sams_v2_audit_logs', 
+        'sams_v2_books', 'sams_v2_book_payments', 'sams_v2_center_schedule'
+      ];
+
+      // 1. Wipe in local storage
+      keys.forEach(k => {
+        localStorage.setItem(`${prefix}${k}`, '[]');
+      });
+
+      // 2. Wipe in Cloud Firestore (Set all keys to empty array '[]')
+      const promises = keys.map(k => {
+        return setDoc(doc(db, 'system_tenant_data', `${prefix}${k}`), {
+          tenantId: wipeTenant.id,
+          key: k,
+          data: '[]',
+          updatedAt: Date.now()
+        });
+      });
+
+      await Promise.all(promises);
+
+      // Force-trigger state refresh in UI
       scanDatabaseIsolation(tenants);
-      addLog('تصفير قاعدة بيانات', `تم مسح وتصفير كافة جداول المعلم (${name}) بناءً على طلب المالك.`, 'warning');
-      showToast('success', `تم تصفير وإفراغ قاعدة بيانات المعلم بنجاح!`);
+
+      addLog('تصفير قاعدة بيانات', `تم تصفير كافة سجلات المعلم (${wipeTenant.name}) بناءً على طلب المالك والتحقق من كلمة المرور.`, 'warning');
+      showToast('success', `تم تصفير وإفراغ قاعدة بيانات المعلم (${wipeTenant.name}) على القرص والسحابة كلياً!`);
+      
+      // Close modal
+      setShowWipeModal(false);
+      setWipeTenant(null);
+      setWipePassword('');
+    } catch (err) {
+      console.error(err);
+      setWipeError('حدث خطأ أثناء الاتصال بالسحابة للتصفير. يرجى المحاولة لاحقاً.');
+    } finally {
+      setIsWiping(false);
     }
   };
 
-  const handleSeedMockData = (tenantId: string, name: string) => {
+  const handleSeedMockData = async (tenantId: string, name: string) => {
     const prefix = `${tenantId}_`;
     
-    // 1. Wipe existing data for this tenant to ensure a clean state for the mock data
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(prefix)) {
-        keysToRemove.push(key);
-      }
+    if (!window.confirm(`📊 هل تريد تغذية قاعدة بيانات المعلم (${name}) ببيانات تجريبية كاملة؟\nسيتم مسح البيانات الحالية وتنزيل الطلاب والمجموعات والحسابات التجريبية فورياً.`)) {
+      return;
     }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    
-    // 2. Seed robust mock structures for presentation/testing
-    const mockStudents = [
-      { id: 's-101', name: 'أحمد محمود العاصي', phone: '01011122233', parentPhone: '01233344455', classId: 'c-1', barcode: '2026101', balance: 0, academicYear: 'third_sec', status: 'active', notes: 'طالب ممتاز ومستمر' },
-      { id: 's-102', name: 'سارة عبد الرحمن يوسف', phone: '01155566677', parentPhone: '01599988811', classId: 'c-1', barcode: '2026102', balance: -150, academicYear: 'third_sec', status: 'active', notes: 'متأخر في قسط يونيو' },
-      { id: 's-103', name: 'عمر هاشم المختار', phone: '01288899900', parentPhone: '01044455566', classId: 'c-2', barcode: '2026103', balance: 50, academicYear: 'first_sec', status: 'active', notes: '' }
-    ];
 
-    const mockClasses = [
-      { id: 'c-1', name: 'مجموعة النخبة - الصف الثالث الثانوي', academicYear: 'third_sec', schedule: 'الأحد والثلاثاء 4 مساءً', price: 150, teacherId: 't-1' },
-      { id: 'c-2', name: 'مجموعة التميز - الصف الأول الثانوي', academicYear: 'first_sec', schedule: 'الإثنين والخميس 6 مساءً', price: 120, teacherId: 't-1' }
-    ];
+    try {
+      const keysToWipe = [
+        'sams_v2_students', 'sams_v2_teachers', 'sams_v2_classes', 'sams_v2_fees', 
+        'sams_v2_attendance', 'sams_v2_exams', 'sams_v2_assignments', 
+        'sams_v2_exam_grades', 'sams_v2_assignment_grades', 'sams_v2_subjects', 
+        'sams_v2_grades', 'sams_v2_notifications', 'sams_v2_audit_logs', 
+        'sams_v2_books', 'sams_v2_book_payments', 'sams_v2_center_schedule'
+      ];
 
-    const mockFees = [
-      { id: 'f-1', studentId: 's-101', studentName: 'أحمد محمود العاصي', className: 'مجموعة النخبة - الصف الثالث الثانوي', amount: 150, date: '2026-07-01', month: 'يوليو 2026', type: 'monthly_subscription', notes: 'تم الدفع كاش بالسكرتارية' },
-      { id: 'f-2', studentId: 's-103', studentName: 'عمر هاشم المختار', className: 'مجموعة التميز - الصف الأول الثانوي', amount: 120, date: '2026-07-02', month: 'يوليو 2026', type: 'monthly_subscription', notes: 'دفع بالفيزا' }
-    ];
+      // Reset all locally
+      keysToWipe.forEach(k => {
+        localStorage.setItem(`${prefix}${k}`, '[]');
+      });
 
-    const setFb = (k: string, v: any) => {
-      const s = JSON.stringify(v);
-      localStorage.setItem(`${prefix}${k}`, s);
-      setDoc(doc(db, 'system_tenant_data', `${prefix}${k}`), {
-        tenantId: prefix.replace('_', ''),
-        key: k,
-        data: s,
-        updatedAt: Date.now()
-      }).catch(err => console.error(err));
-    };
-    setFb('sams_v2_students', mockStudents);
-    setFb('sams_v2_classes', mockClasses);
-    setFb('sams_v2_fees', mockFees);
+      // Corrected robust mock data matching src/types.ts exactly
+      const mockClasses = [
+        { 
+          id: 'c-1', 
+          name: 'مجموعة النخبة - الصف الثالث الثانوي', 
+          schedule_days: 'الأحد والثلاثاء', 
+          schedule_time: '04:00 مساءً', 
+          capacity: 50, 
+          grade_level: 'الصف الثالث الثانوي' 
+        },
+        { 
+          id: 'c-2', 
+          name: 'مجموعة التميز - الصف الأول الثانوي', 
+          schedule_days: 'الإثنين والخميس', 
+          schedule_time: '06:00 مساءً', 
+          capacity: 40, 
+          grade_level: 'الصف الأول الثانوي' 
+        }
+      ];
 
-    scanDatabaseIsolation(tenants);
-    addLog('تغذية بيانات تجريبية', `تم شحن قاعدة بيانات المعلم (${name}) ببيانات توضيحية كاملة لغرض العرض.`, 'success');
-    showToast('success', `تم شحن الحساب ببيانات تجريبية كاملة بنجاح!`);
+      const mockStudents = [
+        { 
+          id: 's-101', 
+          name: 'أحمد محمود العاصي', 
+          registration_id: '2026101', 
+          class_id: 'c-1', 
+          grade_level: 'الصف الثالث الثانوي', 
+          birth_date: '2008-05-15', 
+          phone: '01011122233', 
+          parent_name: 'محمود العاصي', 
+          parent_phone: '01233344455', 
+          status: 'active', 
+          created_at: '2026-07-01 10:00:00' 
+        },
+        { 
+          id: 's-102', 
+          name: 'سارة عبد الرحمن يوسف', 
+          registration_id: '2026102', 
+          class_id: 'c-1', 
+          grade_level: 'الصف الثالث الثانوي', 
+          birth_date: '2008-09-20', 
+          phone: '01155566677', 
+          parent_name: 'عبد الرحمن يوسف', 
+          parent_phone: '01599988811', 
+          status: 'active', 
+          created_at: '2026-07-01 10:15:00' 
+        },
+        { 
+          id: 's-103', 
+          name: 'عمر هاشم المختار', 
+          registration_id: '2026103', 
+          class_id: 'c-2', 
+          grade_level: 'الصف الأول الثانوي', 
+          birth_date: '2010-02-10', 
+          phone: '01288899900', 
+          parent_name: 'هاشم المختار', 
+          parent_phone: '01044455566', 
+          status: 'active', 
+          created_at: '2026-07-02 11:00:00' 
+        }
+      ];
+
+      const mockFees = [
+        { 
+          id: 'f-1', 
+          student_id: 's-101', 
+          amount: 150, 
+          payment_date: '2026-07-01 12:00:00', 
+          payment_method: 'cash', 
+          term: 'first_term', 
+          receipt_number: 'REC-1001', 
+          category: 'tuition', 
+          month: 'يوليو 2026' 
+        },
+        { 
+          id: 'f-2', 
+          student_id: 's-103', 
+          amount: 120, 
+          payment_date: '2026-07-02 13:00:00', 
+          payment_method: 'cash', 
+          term: 'first_term', 
+          receipt_number: 'REC-1002', 
+          category: 'tuition', 
+          month: 'يوليو 2026' 
+        }
+      ];
+
+      localStorage.setItem(`${prefix}sams_v2_classes`, JSON.stringify(mockClasses));
+      localStorage.setItem(`${prefix}sams_v2_students`, JSON.stringify(mockStudents));
+      localStorage.setItem(`${prefix}sams_v2_fees`, JSON.stringify(mockFees));
+
+      // Push all keys to Cloud Firestore
+      const promises = keysToWipe.map(k => {
+        let serializedData = '[]';
+        if (k === 'sams_v2_classes') serializedData = JSON.stringify(mockClasses);
+        if (k === 'sams_v2_students') serializedData = JSON.stringify(mockStudents);
+        if (k === 'sams_v2_fees') serializedData = JSON.stringify(mockFees);
+
+        return setDoc(doc(db, 'system_tenant_data', `${prefix}${k}`), {
+          tenantId: tenantId,
+          key: k,
+          data: serializedData,
+          updatedAt: Date.now()
+        });
+      });
+
+      await Promise.all(promises);
+
+      // Force refresh stats
+      scanDatabaseIsolation(tenants);
+
+      addLog('تغذية بيانات تجريبية', `تم شحن قاعدة بيانات المعلم (${name}) ببيانات تجريبية كاملة بنجاح وعزلها سحابياً.`, 'success');
+      showToast('success', `تم شحن قاعدة بيانات المعلم (${name}) بالبيانات التجريبية كلياً بنجاح!`);
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'حدث خطأ أثناء حقن البيانات التجريبية على السيرفر.');
+    }
   };
 
   const handleSendAnnouncement = (e: React.FormEvent) => {
@@ -979,7 +1212,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
             <div className="bg-gradient-to-l from-rose-600 via-red-500 to-rose-600 text-white px-4 py-2.5 rounded-2xl border border-rose-450 shadow-md flex items-center gap-3 overflow-hidden font-sans shrink-0 relative">
               <span className="flex items-center gap-1 bg-white/20 px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wide animate-pulse shrink-0 border border-white/10">
                 <Megaphone className="w-3.5 h-3.5" />
-                إعلان هام متحرك (معاينة)
+                إعلان هام متحرك
               </span>
               
               <div className="flex-1 min-w-0 overflow-hidden font-bold text-xs" dir="rtl">
@@ -1081,7 +1314,7 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                   <div className="p-6 space-y-4 flex-1 text-center overflow-y-auto no-scrollbar">
                     {!ann.image_url && (
                       <span className="inline-block text-[10px] bg-red-50 text-red-600 px-3 py-1 rounded-full font-black animate-pulse border border-red-100 font-sans">
-                        إشعار عاجل (معاينة)
+                        إشعار عاجل
                       </span>
                     )}
 
@@ -1546,9 +1779,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                 {tenants.map(tenant => {
                   const stats = databaseStats[tenant.id] || { studentsCount: 0, feesCount: 0, keysCount: 0, sizeBytes: 0 };
                   return (
-                    <div key={tenant.id} className="bg-white rounded-3xl border border-gray-150 shadow-sm p-6 space-y-5 relative overflow-hidden">
-                      {/* Active indicator */}
-                      <span className={`absolute top-0 left-0 w-32 h-1 ${tenant.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                    <div key={tenant.id} className="bg-white rounded-3xl border border-gray-150 shadow-sm p-6 space-y-5 relative overflow-hidden group hover:shadow-md hover:border-gray-200 transition-all duration-300">
+                      {/* Premium Top Gradient Glow Bar */}
+                      <div className={`absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r transition-all duration-300 ${
+                        tenant.status === 'active' 
+                          ? 'from-emerald-400 via-teal-500 to-emerald-600 shadow-[0_2px_10px_rgba(16,185,129,0.3)]' 
+                          : 'from-rose-500 via-red-500 to-pink-600 shadow-[0_2px_10px_rgba(239,68,68,0.3)]'
+                      }`} />
+
+                      {/* Soft corner glow effect */}
+                      <div className={`absolute -top-12 -right-12 w-24 h-24 rounded-full blur-2xl opacity-5 pointer-events-none transition-all duration-500 group-hover:opacity-10 ${
+                        tenant.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'
+                      }`} />
 
                       <div className="flex justify-between items-start">
                         <div className="space-y-1 text-right">
@@ -1591,9 +1833,20 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                           <span className="font-mono font-black text-slate-700">{stats.keysCount} جدول معزول</span>
                         </div>
 
-                        <div className="space-y-1 col-span-2 flex items-center justify-between text-[11px]">
-                          <span className="text-slate-400 font-bold">حجم البيانات المستهلكة (Storage Size):</span>
-                          <span className="font-mono font-black text-[#0D5C8C]">{(stats.sizeBytes / 1024).toFixed(2)} KB</span>
+                        <div className="space-y-1 col-span-2 flex items-center justify-between text-[11px] border-t border-gray-200/60 pt-2.5">
+                          <div className="flex items-center gap-1 text-slate-400 font-bold">
+                            <HardDrive className="w-3.5 h-3.5 text-[#0D5C8C]" />
+                            <span>حجم البيانات المستهلكة (Storage Size):</span>
+                          </div>
+                          <span className="font-mono font-black text-[#0D5C8C] bg-sky-50/70 px-2 py-0.5 rounded border border-sky-100/50 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            {stats.sizeBytes < 1024 
+                              ? `${stats.sizeBytes} B` 
+                              : stats.sizeBytes < 1024 * 1024 
+                                ? `${(stats.sizeBytes / 1024).toFixed(2)} KB` 
+                                : `${(stats.sizeBytes / (1024 * 1024)).toFixed(2)} MB`
+                            }
+                          </span>
                         </div>
                       </div>
 
@@ -2278,6 +2531,85 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                   className="px-5 py-2.5 bg-[#0D5C8C] hover:bg-[#1A7FAA] text-white rounded-xl text-xs font-black shadow-md cursor-pointer transition-colors"
                 >
                   تحديث البيانات والتراخيص
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Wipe Database Confirmation Modal */}
+      {showWipeModal && wipeTenant && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn" dir="rtl">
+          <div className="bg-white rounded-3xl border border-red-100 shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn">
+            {/* Header */}
+            <div className="bg-red-50 border-b border-red-100 p-5 flex items-start gap-3.5">
+              <div className="w-11 h-11 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-950">تنبيه أمني فائق الحساسية</h3>
+                <p className="text-[11px] text-red-600 font-bold mt-1">تصفير قاعدة بيانات: {wipeTenant.name}</p>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleConfirmWipe} className="p-5 space-y-4">
+              <div className="text-xs text-slate-600 leading-relaxed space-y-2">
+                <p>
+                  أنت على وشك <strong>حذف وتطهير كافة سجلات البيانات</strong> الخاصة بالمعلم <span className="text-slate-950 font-black">({wipeTenant.name})</span> بشكل نهائي وكامل.
+                </p>
+                <p className="bg-red-50/50 text-red-700/90 text-[11px] p-3 rounded-xl border border-red-100/50 font-semibold leading-relaxed">
+                  ⚠️ سيتم حذف: الطلاب، مجموعات الحصص، سجلات الحضور والغياب، المذكرات، الحسابات المالية والاشتراكات، والامتحانات فوراً من الخادم السحابي وجهاز السكرتارية. لا يمكن التراجع عن هذا القرار بعد التنفيذ!
+                </p>
+              </div>
+
+              <div className="space-y-1.5 pt-2">
+                <label className="block text-[11px] font-black text-slate-700">
+                  يرجى كتابة كلمة مرور المعلم لتأكيد الحذف: *
+                </label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  placeholder="أدخل الباسورد الخاص بالمعلم لتفويض التصفير"
+                  value={wipePassword}
+                  onChange={(e) => setWipePassword(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-red-500 focus:bg-white font-black text-center transition-all"
+                />
+              </div>
+
+              {wipeError && (
+                <div className="p-2.5 bg-red-50 text-red-600 border border-red-100 rounded-xl text-[10px] font-black leading-tight text-center">
+                  {wipeError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-150 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowWipeModal(false); setWipeTenant(null); setWipePassword(''); }}
+                  className="flex-1 py-2.5 border border-gray-250 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                >
+                  إلغاء وتراجع
+                </button>
+                <button
+                  type="submit"
+                  disabled={isWiping}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-xl text-xs font-black shadow-md cursor-pointer transition-colors flex items-center justify-center gap-1"
+                >
+                  {isWiping ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      جاري التطهير...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      تأكيد الحذف النهائي
+                    </>
+                  )}
                 </button>
               </div>
             </form>

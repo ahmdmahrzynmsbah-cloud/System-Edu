@@ -50,6 +50,10 @@ export default function SettingsManager({
   const [whatsappEnabled, setWhatsappEnabled] = useState(() => getTenantSetting('sams_whatsapp_enabled', 'true') !== 'false');
   const [autoAbsenceAlert, setAutoAbsenceAlert] = useState(() => getTenantSetting('sams_auto_absence_alert', 'true') !== 'false');
 
+  // Fee Reminder variables
+  const [enableFeeReminder, setEnableFeeReminder] = useState(() => getTenantSetting('sams_enable_fee_reminder', 'true') !== 'false');
+  const [allowTeacherFeeReminder, setAllowTeacherFeeReminder] = useState(() => getTenantSetting('sams_allow_teacher_fee_reminder', 'true') !== 'false');
+
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
@@ -95,6 +99,8 @@ export default function SettingsManager({
       saveToStorage('sams_ultramsg_token', ultramsgToken.trim());
       saveToStorage('sams_whatsapp_enabled', whatsappEnabled ? 'true' : 'false');
       saveToStorage('sams_auto_absence_alert', autoAbsenceAlert ? 'true' : 'false');
+      saveToStorage('sams_enable_fee_reminder', enableFeeReminder ? 'true' : 'false');
+      saveToStorage('sams_allow_teacher_fee_reminder', allowTeacherFeeReminder ? 'true' : 'false');
 
       // Also update the appName in the main tenants list so Super Admin sees the new name in database size scan!
       if (tenantId !== 'super-admin' && tenantId !== 'default') {
@@ -528,6 +534,54 @@ export default function SettingsManager({
             <p className="text-xs text-slate-500 leading-relaxed">
               عند تفعيل هذا الخيار، سيقوم السيستم تلقائياً برصد غياب الطالب لمرتين متتاليتين في نفس المجموعة، وإرسال تنبيه آلي لولي الأمر (كإشعار محاكاة عبر السيستم) لتحذيره من تكرار الغياب.
             </p>
+          </div>
+        </div>
+
+        {/* ROW 5: Payment Reminder Settings & Permissions */}
+        <div className="bg-white rounded-2xl border border-gray-150 shadow-2xs overflow-hidden">
+          <div className="p-5 border-b border-gray-50 bg-slate-50/50 text-right">
+            <div className="flex items-center gap-2">
+              <span className="w-4.5 h-4.5 text-[#0D5C8C]">💳</span>
+              <h3 className="font-bold text-xs text-slate-800">5. صلاحيات وإعدادات تذكير سداد الاشتراكات والرسوم</h3>
+            </div>
+          </div>
+          
+          <div className="p-5 space-y-5 text-right">
+            <p className="text-xs text-slate-500 leading-relaxed">
+              تحكم بظهور وإتاحة زر "تذكير سداد" الموجود بجانب أسماء الطلاب لتنبيه أولياء أمورهم بالاشتراكات الشهرية المستحقة.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Option A: Disable reminder button entirely */}
+              <div className="p-4 rounded-xl border border-gray-150 bg-slate-50/30 flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-slate-800">تفعيل زر تذكير السداد بشكل عام</h4>
+                  <p className="text-[10px] text-slate-400">إظهار أو إخفاء زر التذكير تماماً من قوائم عرض الطلاب.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEnableFeeReminder(!enableFeeReminder)}
+                  className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${enableFeeReminder ? 'bg-[#0D5C8C]' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${enableFeeReminder ? 'left-1' : 'left-7'}`} />
+                </button>
+              </div>
+
+              {/* Option B: Disable/enable for teachers */}
+              <div className={`p-4 rounded-xl border border-gray-150 bg-slate-50/30 flex items-center justify-between gap-4 transition-opacity ${!enableFeeReminder ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-slate-800">السماح للمدرس بإرسال تذكير سداد</h4>
+                  <p className="text-[10px] text-slate-400">عند تفعيله، يظهر الزر للمدرس أيضاً. عند إغلاقه، يختفي الزر للمدرس ويبقى للإدارة فقط.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAllowTeacherFeeReminder(!allowTeacherFeeReminder)}
+                  className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${allowTeacherFeeReminder ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${allowTeacherFeeReminder ? 'left-1' : 'left-7'}`} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
