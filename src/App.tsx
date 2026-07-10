@@ -553,8 +553,15 @@ export default function App() {
         if (savedTenants) {
           const tenants = JSON.parse(savedTenants);
           const currentTenant = tenants.find((t: any) => t.id === tenantId);
-          if (currentTenant && currentTenant.features) {
-            const allowedIds = [...currentTenant.features, 'privacy', 'books', 'settings', 'analytics'];
+          if (currentTenant) {
+            const isAnalyticsEnabled = currentTenant.analyticsEnabled !== false;
+            const allowedIds = [
+              ...(currentTenant.features || []), 
+              'privacy', 
+              'books', 
+              'settings',
+              ...(isAnalyticsEnabled ? ['analytics'] : [])
+            ];
             return baseItems.filter(item => allowedIds.includes(item.id));
           }
         }

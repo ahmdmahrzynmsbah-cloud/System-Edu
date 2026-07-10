@@ -35,6 +35,7 @@ interface Tenant {
   maxSecretaries?: number;
   whatsappGatewayEnabled?: boolean;
   announcementsEnabled?: boolean;
+  analyticsEnabled?: boolean;
 }
 
 interface SuperAdminLog {
@@ -121,7 +122,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
     maxStudents: 100,
     maxSecretaries: 3,
     whatsappGatewayEnabled: true,
-    announcementsEnabled: true
+    announcementsEnabled: true,
+    analyticsEnabled: true
   });
 
   // Features description array with sub-features for customization
@@ -531,7 +533,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       maxStudents: Number(formData.maxStudents) || 100,
       maxSecretaries: Number(formData.maxSecretaries) || 3,
       whatsappGatewayEnabled: formData.whatsappGatewayEnabled,
-      announcementsEnabled: formData.announcementsEnabled
+      announcementsEnabled: formData.announcementsEnabled,
+      analyticsEnabled: formData.analyticsEnabled
     };
 
     saveTenant(newTenant).then(() => {
@@ -575,7 +578,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
       maxStudents: tenant.maxStudents || 100,
       maxSecretaries: tenant.maxSecretaries || 3,
       whatsappGatewayEnabled: tenant.whatsappGatewayEnabled !== false,
-      announcementsEnabled: tenant.announcementsEnabled !== false
+      announcementsEnabled: tenant.announcementsEnabled !== false,
+      analyticsEnabled: tenant.analyticsEnabled !== false
     });
     setShowEditModal(true);
   };
@@ -604,7 +608,8 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
           maxStudents: Number(formData.maxStudents) || 100,
           maxSecretaries: Number(formData.maxSecretaries) || 3,
           whatsappGatewayEnabled: formData.whatsappGatewayEnabled,
-          announcementsEnabled: formData.announcementsEnabled
+          announcementsEnabled: formData.announcementsEnabled,
+          analyticsEnabled: formData.analyticsEnabled
         };
       }
       return t;
@@ -2221,6 +2226,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                       </button>
                       <span className={`text-[10px] font-bold ${formData.announcementsEnabled ? 'text-indigo-600' : 'text-slate-500'}`}>{formData.announcementsEnabled ? 'مفعلة' : 'معطلة'}</span>
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-700">تفعيل اتخاذ القرار والتحليلات الذكية:</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, analyticsEnabled: !formData.analyticsEnabled})}
+                        className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer focus:outline-hidden ${formData.analyticsEnabled ? 'bg-[#0D5C8C]' : 'bg-slate-300'}`}
+                      >
+                        <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${formData.analyticsEnabled ? 'left-1' : 'left-6'}`} />
+                      </button>
+                      <span className={`text-[10px] font-bold ${formData.analyticsEnabled ? 'text-[#0D5C8C]' : 'text-slate-500'}`}>{formData.analyticsEnabled ? 'مفعلة' : 'معطلة'}</span>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -2446,6 +2463,18 @@ export default function SuperAdminDashboard({ onLogout }: SuperAdminDashboardPro
                         <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${formData.announcementsEnabled ? 'left-1' : 'left-6'}`} />
                       </button>
                       <span className={`text-[10px] font-bold ${formData.announcementsEnabled ? 'text-indigo-600' : 'text-slate-500'}`}>{formData.announcementsEnabled ? 'مفعلة' : 'معطلة'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-700">تفعيل اتخاذ القرار والتحليلات الذكية:</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, analyticsEnabled: !formData.analyticsEnabled})}
+                        className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer focus:outline-hidden ${formData.analyticsEnabled ? 'bg-[#0D5C8C]' : 'bg-slate-300'}`}
+                      >
+                        <span className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm ${formData.analyticsEnabled ? 'left-1' : 'left-6'}`} />
+                      </button>
+                      <span className={`text-[10px] font-bold ${formData.analyticsEnabled ? 'text-[#0D5C8C]' : 'text-slate-500'}`}>{formData.analyticsEnabled ? 'مفعلة' : 'معطلة'}</span>
                     </div>
                   </div>
 
