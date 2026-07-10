@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, User, Plus, Check, X, Trash2, Edit2, Lock } from 'lucide-react';
+import { Shield, Key, User, Plus, Check, X, Trash2, Edit2, Lock, Search, Filter } from 'lucide-react';
 import { getSystemUsersByTenant, saveSystemUser, deleteSystemUser, subscribeToSystemUsers } from '../lib/usersApi';
 
 interface SystemUser {
@@ -27,6 +27,10 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
   const [formData, setFormData] = useState<Partial<SystemUser>>({ role: 'secretary', name: '', password: '', permissions: [] });
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
+  // filtering state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+
   const availableTabs = [
     { id: 'dashboard', label: 'لوحة التحكم والمؤشرات' },
     { id: 'students', label: 'إدارة الطلاب والقبول' },
@@ -205,6 +209,12 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
     setShowAddForm(true);
   };
 
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
   return (
     <div className="space-y-6 animate-fade-in" dir="rtl">
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -223,6 +233,33 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
           <Plus className="w-4 h-4" />
           <span>إضافة سكرتيرة جديدة</span>
         </button>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-slate-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="بحث باسم المستخدم..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-3 pr-9 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0D5C8C] bg-slate-50 focus:bg-white transition-colors font-semibold"
+          />
+        </div>
+        <div className="flex-1 w-full flex items-center gap-2">
+          <Filter className="h-4 w-4 text-slate-400" />
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="w-full p-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0D5C8C] bg-slate-50 focus:bg-white transition-colors font-semibold"
+          >
+            <option value="all">كل الصلاحيات (الكل)</option>
+            <option value="teacher">المدير الأكاديمي</option>
+            <option value="secretary">سكرتيرة</option>
+          </select>
+        </div>
       </div>
 
       {successMsg && (
@@ -355,8 +392,15 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map(u => (
-              <tr key={u.id} className="hover:bg-slate-50/50">
+            {filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-slate-500 font-semibold text-sm bg-slate-50/50">
+                  لا توجد نتائج مطابقة للبحث أو الفلتر 🔍
+                </td>
+              </tr>
+            ) : (
+              filteredUsers.map(u => (
+                <tr key={u.id} className="hover:bg-slate-50/50">
                 <td className="p-4 font-bold text-slate-800">{u.name}</td>
                 <td className="p-4">
                   {u.role === 'teacher' ? (
@@ -394,7 +438,7 @@ export default function SystemRoles({ onRefreshAllData }: SystemRolesProps) {
                   </div>
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>

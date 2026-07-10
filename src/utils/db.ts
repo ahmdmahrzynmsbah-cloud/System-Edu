@@ -383,7 +383,7 @@ export const samsDb = {
 
   deleteClass(id: string): { success: boolean; error?: string } {
     const students = this.getStudents();
-    const classStudents = students.filter(s => s.class_id === id);
+    const classStudents = students.filter(s => (s.class_ids || [s.class_id, s.class_id_2].filter(Boolean)).includes(id));
     if (classStudents.length > 0) {
       return { success: false, error: `لا يمكن حذف هذه المجموعة لوجود عدد (${classStudents.length}) طلاب مقيدين بها حالياً. برجاء نقل الطلاب لمجموعات أخرى أولاً.` };
     }
@@ -559,7 +559,7 @@ export const samsDb = {
 
   resetClassAttendance(class_id: string, date: string) {
     const list = this.getAttendance();
-    const students = this.getStudents().filter(s => s.class_id === class_id);
+    const students = this.getStudents().filter(s => (s.class_ids || [s.class_id, s.class_id_2].filter(Boolean)).includes(class_id));
     const studentIds = students.map(s => s.id);
     
     // Filter out any attendance records for these students on this date

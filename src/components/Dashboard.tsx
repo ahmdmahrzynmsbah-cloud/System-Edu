@@ -1061,13 +1061,28 @@ let gradeFees = {
                     </h5>
                     <div className="space-y-2">
                       {selectedDayEvents.classes.map((cls) => {
-                        const scheduleTime = cls.schedule_time || '12:00';
+                        let scheduleTime = '12:00';
+                        const dayNameAr = ARABIC_WEEKDAYS[selectedDate.getDay()];
+                        if (cls.schedule_time && cls.schedule_time.startsWith('{')) {
+                           try {
+                             const times = JSON.parse(cls.schedule_time);
+                             if (times[dayNameAr]) {
+                               scheduleTime = times[dayNameAr];
+                             }
+                           } catch (e) {}
+                        } else if (cls.schedule_time) {
+                           scheduleTime = cls.schedule_time;
+                        }
+
+                        // Ensure we only try to split if it's actually in HH:MM format (basic check)
+                        const isValidTime = /^\d{1,2}:\d{2}$/.test(scheduleTime);
+                        
                         let isApproaching = false;
                         let timeMsg = '';
 
                         const isSelectedToday = formatDateString(selectedDate) === formatDateString(currentTime);
 
-                        if (isSelectedToday) {
+                        if (isSelectedToday && isValidTime) {
                           const [hours, minutes] = scheduleTime.split(':').map(Number);
                           const classTime = new Date(currentTime);
                           classTime.setHours(hours, minutes, 0, 0);
@@ -1082,6 +1097,17 @@ let gradeFees = {
                             isApproaching = true;
                             timeMsg = 'جارية الآن';
                           }
+                        }
+
+                        // Format the time for display if it's in HH:MM
+                        let displayTime = scheduleTime;
+                        if (isValidTime) {
+                           const [h, m] = scheduleTime.split(':');
+                           let hh = parseInt(h, 10);
+                           const ampm = hh >= 12 ? 'م' : 'ص';
+                           hh = hh % 12;
+                           hh = hh ? hh : 12;
+                           displayTime = `${hh}:${m} ${ampm}`;
                         }
 
                         return (
@@ -1100,7 +1126,7 @@ let gradeFees = {
                                 )}
                               </div>
                               <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] ${isApproaching ? 'text-rose-600 bg-rose-100' : 'text-emerald-600 bg-emerald-50'}`}>
-                                {scheduleTime}
+                                {displayTime}
                               </span>
                             </div>
                             <div className={`flex items-center justify-between text-[10px] ${isApproaching ? 'text-rose-500/80 font-semibold' : 'text-slate-400'}`}>

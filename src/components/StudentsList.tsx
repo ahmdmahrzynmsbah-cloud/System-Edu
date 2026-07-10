@@ -513,7 +513,7 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
       (s.name && s.name.toLowerCase().includes(searchLower)) || 
       (s.registration_id && s.registration_id.toLowerCase().includes(searchLower)) ||
       (s.barcode && s.barcode.toLowerCase().includes(searchLower));
-    const matchesClass = classFilter.length === 0 || classFilter.includes(s.class_id) || (s.class_id_2 ? classFilter.includes(s.class_id_2) : false);
+    const matchesClass = classFilter.length === 0 || (s.class_ids || [s.class_id, s.class_id_2].filter(Boolean)).some(id => classFilter.includes(id));
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     const matchesGrade = gradeFilter === 'all' || s.grade_level === gradeFilter;
     
@@ -1201,14 +1201,11 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
                           <div className="flex flex-wrap gap-1">
-                            <span className="font-bold text-[#0D5C8C] text-xs bg-sky-50 px-2 py-0.5 rounded border border-sky-100 inline-flex items-center">
-                              {classes.find(c => c.id === student.class_id)?.name || '-'}
-                            </span>
-                            {student.class_id_2 && (
-                              <span className="font-bold text-indigo-700 text-xs bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 inline-flex items-center">
-                                {classes.find(c => c.id === student.class_id_2)?.name || '-'}
+                            {(student.class_ids || [student.class_id, student.class_id_2].filter(Boolean)).map((id, idx) => (
+                              <span key={id} className={`font-bold text-xs px-2 py-0.5 rounded border inline-flex items-center ${idx === 0 ? 'text-[#0D5C8C] bg-sky-50 border-sky-100' : 'text-indigo-700 bg-indigo-50 border-indigo-100'}`}>
+                                {classes.find(c => c.id === id)?.name || '-'}
                               </span>
-                            )}
+                            ))}
                           </div>
                           <span className="text-[10px] text-slate-500 mt-0.5 mr-0.5">{student.grade_level}</span>
                         </div>
@@ -1347,11 +1344,10 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
                 <div className="grid grid-cols-2 gap-2 text-xxs">
                   <div className="bg-slate-50 p-2 rounded-xl border border-slate-100/70">
                     <span className="text-[9px] text-slate-400 block font-bold mb-0.5">المجموعات والصف</span>
-                    <span className="font-bold text-slate-700 truncate block">
-                      {classes.find(c => c.id === student.class_id)?.name || '-'}
-                      {student.class_id_2 && ` / ${classes.find(c => c.id === student.class_id_2)?.name || ''}`}
+                    <span className="font-bold text-slate-700 truncate block whitespace-normal leading-tight">
+                      {(student.class_ids || [student.class_id, student.class_id_2].filter(Boolean)).map(id => classes.find(c => c.id === id)?.name).filter(Boolean).join(' / ') || '-'}
                     </span>
-                    <span className="text-[10px] text-slate-500 block">{student.grade_level}</span>
+                    <span className="text-[10px] text-slate-500 block mt-1">{student.grade_level}</span>
                   </div>
 
                   <div className="bg-slate-50 p-2 rounded-xl border border-slate-100/70">
@@ -1498,14 +1494,11 @@ export default function StudentsList({ userRole }: StudentsListProps = {}) {
                   <div className="flex justify-between p-2 border-b border-slate-50">
                     <span className="text-slate-500">المجموعات المقيد بها</span>
                     <div className="flex flex-wrap gap-1 justify-end">
-                      <span className="font-bold text-[#1A7FAA] bg-[#1A7FAA]/5 px-2 py-0.5 rounded text-[11px]">
-                        {classes.find(c => c.id === selectedProfile.class_id)?.name || '-'}
-                      </span>
-                      {selectedProfile.class_id_2 && (
-                        <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-[11px]">
-                          {classes.find(c => c.id === selectedProfile.class_id_2)?.name || '-'}
+                      {(selectedProfile.class_ids || [selectedProfile.class_id, selectedProfile.class_id_2].filter(Boolean)).map((id, idx) => (
+                        <span key={id} className={`font-bold px-2 py-0.5 rounded text-[11px] ${idx === 0 ? 'text-[#1A7FAA] bg-[#1A7FAA]/5' : 'text-indigo-700 bg-indigo-50'}`}>
+                          {classes.find(c => c.id === id)?.name || '-'}
                         </span>
-                      )}
+                      ))}
                     </div>
                   </div>
                   <div className="flex justify-between p-2 border-b border-slate-50">

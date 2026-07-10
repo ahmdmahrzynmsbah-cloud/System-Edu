@@ -46,7 +46,7 @@ export default function StudentBarcodes() {
       student.registration_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.phone.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesClass = classFilter === 'all' || student.class_id === classFilter;
+    const matchesClass = classFilter === 'all' || (student.class_ids || [student.class_id, student.class_id_2].filter(Boolean)).includes(classFilter);
     const matchesGrade = gradeFilter === 'all' || student.grade_level === gradeFilter;
 
     return matchesSearch && matchesClass && matchesGrade;
@@ -68,10 +68,30 @@ export default function StudentBarcodes() {
     }
   };
 
+  const formatDisplaySchedule = (cls?: ClassRoom) => {
+    if (!cls) return 'غير محدد';
+    if (!cls.schedule_days) return 'المواعيد غير محددة';
+    try {
+      const times = JSON.parse(cls.schedule_time || '{}');
+      const formattedTimes = Object.entries(times).map(([day, time]) => {
+        const t = time as string;
+        if (!t) return day;
+        const [h, m] = t.split(':');
+        let hh = parseInt(h, 10);
+        const ampm = hh >= 12 ? 'م' : 'ص';
+        hh = hh % 12;
+        hh = hh ? hh : 12;
+        return `${day} (${hh}:${m} ${ampm})`;
+      });
+      return formattedTimes.join(' ، ');
+    } catch (e) {
+      return `${cls.schedule_days} - ${cls.schedule_time || ''}`;
+    }
+  };
+
   const handlePrintSingle = (student: Student) => {
     const classroom = classes.find(c => c.id === student.class_id);
-    const scheduleDays = classroom?.schedule_days || '';
-    const scheduleTime = classroom?.schedule_time || '';
+    const scheduleFormatted = formatDisplaySchedule(classroom);
     
     const printWindow = window.open('', '_blank', 'width=450,height=300');
     if (!printWindow) {
@@ -238,7 +258,7 @@ export default function StudentBarcodes() {
               <div class="student-info">
                 <div class="student-name">${student.name}</div>
                 <div class="meta-row">المجموعة: <span>${classroom?.name || 'غير محدد'}</span></div>
-                <div class="meta-row">المواعيد: <span>${scheduleDays || 'غير محدد'}</span> | الوقت: <span>الساعة ${scheduleTime || 'غير محدد'}</span></div>
+                <div class="meta-row">المواعيد: <span style="font-size: 8px;">${scheduleFormatted}</span></div>
               </div>
               <div class="barcode-wrapper" dir="ltr">
                 ${barcodeHtml}
@@ -271,8 +291,7 @@ export default function StudentBarcodes() {
     let labelsHtml = '';
     selectedStudentsList.forEach((student) => {
       const classroom = classes.find(c => c.id === student.class_id);
-      const scheduleDays = classroom?.schedule_days || '';
-      const scheduleTime = classroom?.schedule_time || '';
+      const scheduleFormatted = formatDisplaySchedule(classroom);
       const barcodeHtml = document.getElementById(`print-barcode-view-${student.id}`)?.innerHTML || '';
 
       labelsHtml += `
@@ -282,7 +301,7 @@ export default function StudentBarcodes() {
             <div class="student-info">
               <div class="student-name">${student.name}</div>
               <div class="meta-row">المجموعة: <span>${classroom?.name || 'غير محدد'}</span></div>
-              <div class="meta-row">المواعيد: <span>${scheduleDays || 'غير محدد'}</span> | الوقت: <span>الساعة ${scheduleTime || 'غير محدد'}</span></div>
+              <div class="meta-row">المواعيد: <span style="font-size: 8px;">${scheduleFormatted}</span></div>
             </div>
             <div class="barcode-wrapper" dir="ltr">
               ${barcodeHtml}

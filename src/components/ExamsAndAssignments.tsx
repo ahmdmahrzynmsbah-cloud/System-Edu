@@ -422,7 +422,7 @@ export default function ExamsAndAssignments() {
     let hasValidationError = false;
 
     // First validate scores
-    const groupStudents = students.filter(s => s.class_id === selectedClassId || s.class_id_2 === selectedClassId);
+    const groupStudents = students.filter(s => (s.class_ids || [s.class_id, s.class_id_2].filter(Boolean)).includes(selectedClassId));
     for (const student of groupStudents) {
       const entry = tempGrades[student.id];
       if (entry) {
@@ -488,7 +488,7 @@ export default function ExamsAndAssignments() {
 
   // Student list inside the active class
     const activeClassStudents = useMemo(() => {
-      return students.filter(s => s.class_id === selectedClassId || s.class_id_2 === selectedClassId);
+      return students.filter(s => (s.class_ids || [s.class_id, s.class_id_2].filter(Boolean)).includes(selectedClassId));
     }, [students, selectedClassId]);
 
   // Exam list search filter
