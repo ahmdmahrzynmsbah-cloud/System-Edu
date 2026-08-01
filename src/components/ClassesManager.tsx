@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ClassRoom, Teacher, Subject, CenterScheduleData, Student } from '../types';
 import { samsDb } from '../utils/db';
-import { Plus, BookOpen, User, Users, Maximize2, Search, ShieldAlert, Check, Calendar, Trash2, Edit, CheckCircle, X, ExternalLink, Eye, ArrowRight, Phone, Info } from 'lucide-react';
+import { Plus, BookOpen, User, Users, Maximize2, Search, ShieldAlert, Check, Calendar, Trash2, Edit, CheckCircle, X, ExternalLink, Eye, ArrowRight, Phone, Info, Archive, ArchiveRestore } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ClassesManager() {
@@ -22,6 +22,9 @@ export default function ClassesManager() {
   const [classSearchQuery, setClassSearchQuery] = useState('');
   const [successText, setSuccessText] = useState('');
   const [classToDelete, setClassToDelete] = useState<ClassRoom | null>(null);
+  const [viewArchivedClasses, setViewArchivedClasses] = useState(false);
+  const [classToArchive, setClassToArchive] = useState<ClassRoom | null>(null);
+  const [classToRestore, setClassToRestore] = useState<ClassRoom | null>(null);
   
   const [classForm, setClassForm] = useState({
     name: '',
@@ -62,6 +65,25 @@ export default function ClassesManager() {
     }
   }, [successText]);
 
+  
+  const confirmArchiveClass = () => {
+    if (classToArchive) {
+      samsDb.archiveClass(classToArchive.id);
+      setSuccessText(`تم أرشفة المجموعة "${classToArchive.name}" بنجاح!`);
+      setClassToArchive(null);
+      loadData();
+    }
+  };
+
+  const confirmRestoreClass = () => {
+    if (classToRestore) {
+      samsDb.restoreClass(classToRestore.id);
+      setSuccessText(`تم استعادة المجموعة "${classToRestore.name}" بنجاح!`);
+      setClassToRestore(null);
+      loadData();
+    }
+  };
+
   const confirmDeleteClass = () => {
     if (classToDelete) {
       const res = samsDb.deleteClass(classToDelete.id);
@@ -77,8 +99,8 @@ export default function ClassesManager() {
   };
 
   const loadData = () => {
-    setClasses(samsDb.getClasses());
-    setStudents(samsDb.getStudents());
+    setClasses(samsDb.getClasses(true));
+    setStudents(samsDb.getStudents(true));
     setTeachers(samsDb.getTeachers());
     setSubjects(samsDb.getSubjects());
     setSchedule(samsDb.getCenterSchedule());
@@ -567,12 +589,22 @@ export default function ClassesManager() {
           <option value="الثاني الثانوي">الثاني الثانوي</option>
           <option value="الثالث الثانوي">الثالث الثانوي</option>
         </select>
+        <button
+          onClick={() => setViewArchivedClasses(!viewArchivedClasses)}
+          className={`h-10 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border ${viewArchivedClasses ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+        >
+          {viewArchivedClasses ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+          {viewArchivedClasses ? 'إخفاء الأرشيف' : 'سجل الأرشيف'}
+        </button>
       </div>
 
       {/* Class list Grid cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {classes
           .filter(cls => {
+            const isArchived = cls.is_archived === true;
+            if (viewArchivedClasses && !isArchived) return false;
+            if (!viewArchivedClasses && isArchived) return false;
             const matchesGrade = classGradeFilter === 'all' || cls.grade_level === classGradeFilter;
             const q = classSearchQuery.toLowerCase();
             const matchesSearch = 
@@ -600,10 +632,27 @@ export default function ClassesManager() {
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>
+                  {cls.is_archived ? (
+                    <button
+                      onClick={() => setClassToRestore(cls)}
+                      className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all cursor-pointer"
+                      title="استعادة من الأرشيف"
+                    >
+                      <ArchiveRestore className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setClassToArchive(cls)}
+                      className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all cursor-pointer"
+                      title="أرشفة المجموعة"
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <button
                     onClick={() => setClassToDelete(cls)}
                     className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
-                    title="حذف المجموعة"
+                    title="حذف المجموعة نهائياً"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -792,6 +841,97 @@ export default function ClassesManager() {
           <div className="text-center p-5 text-slate-500 text-xs">جاري تحميل الجدول...</div>
         )}
       </div>
+
+
+      {/* Archive Confirmation Modal */}
+      <AnimatePresence>
+        {classToArchive && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" dir="rtl">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-md w-full p-6 text-right space-y-4"
+            >
+              <div className="flex items-center gap-3 text-amber-600">
+                <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center">
+                  <Archive className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-950 text-sm">تأكيد أرشفة المجموعة الدراسية</h3>
+                  <p className="text-[11px] text-slate-500 font-sans">سيتم إخفاء المجموعة عن القوائم النشطة</p>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-700 leading-relaxed font-sans space-y-2 py-2 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                <p>هل أنت متأكد من رغبتك في أرشفة المجموعة: <strong className="text-amber-700">"{classToArchive.name}"</strong>؟</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setClassToArchive(null)}
+                  className="px-4 py-2 border border-gray-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmArchiveClass}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  تأكيد الأرشفة
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Restore Confirmation Modal */}
+      <AnimatePresence>
+        {classToRestore && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" dir="rtl">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-md w-full p-6 text-right space-y-4"
+            >
+              <div className="flex items-center gap-3 text-emerald-600">
+                <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center">
+                  <ArchiveRestore className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-950 text-sm">استعادة المجموعة الدراسية</h3>
+                  <p className="text-[11px] text-slate-500 font-sans">ستعود المجموعة إلى القوائم النشطة</p>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-700 leading-relaxed font-sans space-y-2 py-2 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                <p>هل أنت متأكد من رغبتك في استعادة المجموعة: <strong className="text-emerald-700">"{classToRestore.name}"</strong>؟</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setClassToRestore(null)}
+                  className="px-4 py-2 border border-gray-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRestoreClass}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  تأكيد الاستعادة
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Custom Delete Confirmation Modal */}
       <AnimatePresence>

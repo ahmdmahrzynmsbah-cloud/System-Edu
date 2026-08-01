@@ -32,6 +32,8 @@ export interface Teacher {
   phone: string;
   email: string;
   status: 'active' | 'inactive';
+  is_archived?: boolean;
+  archived_at?: string;
   joined_date: string;
   deleted_at?: string;
 }
@@ -42,6 +44,8 @@ export interface ClassRoom {
   schedule_days?: string; // مواعيد المجموعة (أيام)
   schedule_time?: string; // وقت المجموعة
   capacity: number; // السعة
+  is_archived?: boolean;
+  archived_at?: string;
   grade_level: string; // المستوى الدراسي
 }
 

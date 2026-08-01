@@ -249,10 +249,10 @@ export const samsDb = {
   },
 
   // STUDENTS CRUD
-  getStudents(includeArchivedOrSuspended = true): Student[] {
+  getStudents(includeArchived = false): Student[] {
     const students = loadFromStorage<Student[]>(KEYS.STUDENTS, INITIAL_STUDENTS);
     // filter soft deletions
-    return students.filter(s => !s.deleted_at);
+    return students.filter(s => !s.deleted_at && (includeArchived || !s.is_archived));
   },
 
   addStudent(student: Omit<Student, 'id' | 'registration_id' | 'created_at'>): { success: boolean; error?: string; student?: Student } {
@@ -370,12 +370,13 @@ export const samsDb = {
   },
 
   // CLASSES & SUBJECTS
-  getClasses(): ClassRoom[] {
-    return loadFromStorage<ClassRoom[]>(KEYS.CLASSES, INITIAL_CLASSES);
+  getClasses(includeArchived = false): ClassRoom[] {
+    const classes = loadFromStorage<ClassRoom[]>(KEYS.CLASSES, INITIAL_CLASSES);
+    return classes.filter(c => includeArchived || !c.is_archived);
   },
 
   addClass(cls: ClassRoom) {
-    const classes = this.getClasses();
+    const classes = loadFromStorage<ClassRoom[]>(KEYS.CLASSES, INITIAL_CLASSES);
     classes.push(cls);
     saveToStorage(KEYS.CLASSES, classes);
     addAuditLog('INSERT', 'classes', cls.id, `إنشاء مجموعة دراسي جديد: ${cls.name}`);
@@ -383,12 +384,33 @@ export const samsDb = {
 
   
   updateClass(updatedCls: ClassRoom) {
-    const classes = this.getClasses();
+    const classes = loadFromStorage<ClassRoom[]>(KEYS.CLASSES, INITIAL_CLASSES);
     const idx = classes.findIndex(c => c.id === updatedCls.id);
     if (idx !== -1) {
       classes[idx] = updatedCls;
       saveToStorage(KEYS.CLASSES, classes);
       addAuditLog('UPDATE', 'classes', updatedCls.id, `تحديث بيانات المجموعة الدراسية: ${updatedCls.name}`);
+    }
+  },
+  
+  archiveClass(id: string) {
+    const classes = loadFromStorage<ClassRoom[]>(KEYS.CLASSES, INITIAL_CLASSES);
+    const idx = classes.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      classes[idx].is_archived = true;
+      classes[idx].archived_at = new Date().toISOString();
+      saveToStorage(KEYS.CLASSES, classes);
+      addAuditLog('UPDATE', 'classes', id, `أرشفة المجموعة الدراسية: ${classes[idx].name}`);
+    }
+  },
+  restoreClass(id: string) {
+    const classes = loadFromStorage<ClassRoom[]>(KEYS.CLASSES, INITIAL_CLASSES);
+    const idx = classes.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      classes[idx].is_archived = false;
+      delete classes[idx].archived_at;
+      saveToStorage(KEYS.CLASSES, classes);
+      addAuditLog('UPDATE', 'classes', id, `استعادة المجموعة الدراسية من الأرشيف: ${classes[idx].name}`);
     }
   },
   deleteClass(id: string): { success: boolean; error?: string } {
@@ -397,7 +419,7 @@ export const samsDb = {
     if (classStudents.length > 0) {
       return { success: false, error: `لا يمكن حذف هذه المجموعة لوجود عدد (${classStudents.length}) طلاب مقيدين بها حالياً. برجاء نقل الطلاب لمجموعات أخرى أولاً.` };
     }
-    const classes = this.getClasses();
+    const classes = loadFromStorage<ClassRoom[]>(KEYS.CLASSES, INITIAL_CLASSES);
     const classObj = classes.find(c => c.id === id);
     const className = classObj ? classObj.name : id;
     const filtered = classes.filter(c => c.id !== id);

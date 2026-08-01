@@ -185,8 +185,8 @@ export default function AttendanceTracker() {
   const [scanFeedback, setScanFeedback] = useState<{type: 'success'|'error', msg: string} | null>(null);
 
   const loadData = () => {
-    setStudents(samsDb.getStudents().filter(s => s.status !== 'archived'));
-    setClasses(samsDb.getClasses());
+    setStudents(samsDb.getStudents().filter(s => s.status === 'active' && !s.is_archived));
+    setClasses(samsDb.getClasses().filter(c => !c.is_archived));
     setAttendance(samsDb.getAttendance());
     setFees(samsDb.getFees());
   };
