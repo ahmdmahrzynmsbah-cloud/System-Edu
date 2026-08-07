@@ -1,10 +1,6 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
+import ReactBarcode from 'react-barcode';
 
 interface BarcodeProps {
   value: string;
@@ -22,89 +18,14 @@ export default function Barcode({
   renderType = 'both'
 }: BarcodeProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
-
-  // Code 39 pattern map: W = Wide, N = Narrow
-  const CODE39_PATTERNS: Record<string, string> = {
-    '0': 'N N N W W N W N N',
-    '1': 'W N N W N N N N W',
-    '2': 'N N W W N N N N W',
-    '3': 'W N W W N N N N N',
-    '4': 'N N N W W N N N W',
-    '5': 'W N N W W N N N N',
-    '6': 'N N W W W N N N N',
-    '7': 'N N N W N N W N W',
-    '8': 'W N N W N N W N N',
-    '9': 'N N W W N N W N N',
-    'A': 'W N N N N W N N W',
-    'B': 'N N W N N W N N W',
-    'C': 'W N W N N W N N N',
-    'D': 'N N N N W W N N W',
-    'E': 'W N N N W W N N N',
-    'F': 'N N W N W W N N N',
-    'G': 'N N N N N W W N W',
-    'H': 'W N N N N W W N N',
-    'I': 'N N W N N W W N N',
-    'J': 'N N N N W W W N N',
-    '-': 'N N N W N N N W W',
-    '.': 'W N N W N N N W N',
-    ' ': 'N N W W N N N W N',
-    '*': 'N N W N W N W N N' // Start/Stop
-  };
-
-  // Format value to upper case and wrap with start/stop asterisk
-  const cleanValue = value.toUpperCase().replace(/[^0-9A-Z\-.\s]/g, '');
-  const barcodeString = `*${cleanValue}*`;
-
-  // Calculate widths
-  const narrowWidth = width;
-  const wideWidth = width * 2.8; // Standard Code 39 wide-to-narrow ratio is between 2.0 and 3.0
-  const interCharacterGap = width;
-
-  let totalWidth = 0;
-  const elements: { isBar: boolean; width: number; x: number }[] = [];
-
-  // Add Left Quiet Zone (minimum 10 narrow elements)
-  const quietZoneWidth = narrowWidth * 10;
-  totalWidth += quietZoneWidth;
-
-  for (let i = 0; i < barcodeString.length; i++) {
-    const char = barcodeString[i];
-    const pattern = CODE39_PATTERNS[char];
-    if (!pattern) continue;
-
-    const sequence = pattern.split(' ');
-    sequence.forEach((symbol, index) => {
-      const isBar = index % 2 === 0;
-      const elWidth = symbol === 'W' ? wideWidth : narrowWidth;
-      elements.push({
-        isBar,
-        width: elWidth,
-        x: totalWidth
-      });
-      totalWidth += elWidth;
-    });
-
-    // Add inter-character gap after each character except the last one
-    if (i < barcodeString.length - 1) {
-      elements.push({
-        isBar: false,
-        width: interCharacterGap,
-        x: totalWidth
-      });
-      totalWidth += interCharacterGap;
-    }
-  }
-
-  // Add Right Quiet Zone
-  totalWidth += quietZoneWidth;
-
+  
   // Generate QR code base64 url
   useEffect(() => {
     if (renderType === 'qrcode' || renderType === 'both') {
       QRCode.toDataURL(value, {
         margin: 1,
         width: 160,
-        errorCorrectionLevel: 'H', // High error correction level for easy camera scanning
+        errorCorrectionLevel: 'H',
         color: {
           dark: '#000000',
           light: '#ffffff'
@@ -115,6 +36,8 @@ export default function Barcode({
     }
   }, [value, renderType]);
 
+  const cleanValue = value.toUpperCase().replace(/[^0-9A-Z\-.\s]/g, '');
+
   return (
     <div className="flex flex-col items-center justify-center bg-white p-3 rounded-2xl border border-slate-100 shadow-3xs hover:shadow-2xs transition-all w-full" dir="ltr">
       
@@ -124,36 +47,17 @@ export default function Barcode({
         {/* BARCODE RENDER */}
         {(renderType === 'barcode' || renderType === 'both') && (
           <div className="flex flex-col items-center justify-center grow max-w-full">
-            {/* SVG wrapper with absolute height and crisp pixel widths to prevent stretch distortion */}
             <div className="bg-white p-2 rounded-lg border border-slate-100 flex items-center justify-center overflow-hidden w-full">
-              <svg
-                width={totalWidth}
-                height={height}
-                viewBox={`0 0 ${totalWidth} ${height}`}
-                style={{ 
-                  shapeRendering: 'crispEdges',
-                  maxWidth: '100%',
-                  height: `${height}px` 
-                }}
-                className="block"
-              >
-                {/* Clean white background to provide high contrast contrast */}
-                <rect width={totalWidth} height={height} fill="#ffffff" />
-                
-                {elements.map((el, idx) => {
-                  if (!el.isBar) return null;
-                  return (
-                    <rect
-                      key={idx}
-                      x={el.x}
-                      y={0}
-                      width={el.width}
-                      height={height}
-                      fill="#000000"
-                    />
-                  );
-                })}
-              </svg>
+               <ReactBarcode 
+                  value={cleanValue} 
+                  width={width} 
+                  height={height} 
+                  displayValue={false} 
+                  background="#ffffff" 
+                  lineColor="#000000" 
+                  margin={0}
+                  format="CODE128"
+               />
             </div>
             {showText && renderType === 'barcode' && (
               <span className="mt-1.5 text-[10px] font-mono tracking-[4px] font-bold text-slate-800 uppercase text-center">
@@ -176,7 +80,6 @@ export default function Barcode({
             </div>
           </div>
         )}
-
       </div>
 
       {/* Unified Caption display */}
@@ -187,7 +90,6 @@ export default function Barcode({
           </span>
         </div>
       )}
-
     </div>
   );
 }

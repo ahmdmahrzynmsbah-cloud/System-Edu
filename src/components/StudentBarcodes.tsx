@@ -100,7 +100,37 @@ export default function StudentBarcodes() {
     }
     
     // Capture the barcode SVG from our target div
-    const barcodeHtml = document.getElementById(`print-barcode-view-${student.id}`)?.innerHTML || '';
+    
+    
+    const barcodeEl = document.getElementById(`print-barcode-view-${student.id}`);
+    const svgEl = barcodeEl?.querySelector('svg');
+    const imgEl = barcodeEl?.querySelector('img');
+    const spanEl = barcodeEl?.querySelector('span');
+    
+    let barcodeHtml = '';
+    
+    if (svgEl && imgEl) {
+       barcodeHtml = `<div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 2mm; width: 100%;">
+         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
+           ${svgEl.outerHTML}
+           ${spanEl ? `<span>${spanEl.innerText}</span>` : ''}
+         </div>
+         <div style="display: flex; align-items: center; justify-content: center;">
+           ${imgEl.outerHTML}
+         </div>
+       </div>`;
+    } else if (svgEl) {
+       barcodeHtml = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+         ${svgEl.outerHTML}
+         ${spanEl ? `<span>${spanEl.innerText}</span>` : ''}
+       </div>`;
+    } else if (imgEl) {
+       barcodeHtml = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+         ${imgEl.outerHTML}
+         ${spanEl ? `<span>${spanEl.innerText}</span>` : ''}
+       </div>`;
+    }
+
     
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -202,7 +232,7 @@ export default function StudentBarcodes() {
             }
             .barcode-wrapper {
               width: 100%;
-              height: 10mm;
+              height: 14mm;
               display: flex;
               flex-direction: row;
               align-items: center;
@@ -210,28 +240,16 @@ export default function StudentBarcodes() {
               margin-top: 0.2mm;
               direction: ltr !important;
             }
-            .barcode-wrapper > div {
-              background-color: #ffffff !important;
-              border: none !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              width: 100% !important;
-              box-shadow: none !important;
-            }
-            .barcode-wrapper > div > div {
-              display: flex !important;
-              flex-direction: row !important;
-              align-items: center !important;
-              justify-content: center !important;
-              gap: 2mm !important;
-              width: 100% !important;
-              direction: ltr !important;
-            }
+            
+            
+            
+            
             .barcode-wrapper svg {
-              height: 7.5mm !important;
-              max-width: 65% !important;
+              height: 11mm !important;
+              width: auto !important;
+              max-width: 100% !important;
               display: block !important;
-              margin: 0 !important;
+              margin: 0 auto !important;
             }
             .barcode-wrapper img {
               height: 8.5mm !important;
@@ -241,14 +259,15 @@ export default function StudentBarcodes() {
             }
             .barcode-wrapper span {
               font-family: monospace !important;
-              font-size: 5.5px !important;
+              font-size: 7px !important;
               color: #000000 !important;
-              margin-top: 0.5px !important;
-              letter-spacing: 0.5px !important;
+              margin-top: 1mm !important;
+              letter-spacing: 2px !important;
               font-weight: bold !important;
               direction: ltr !important;
               display: block !important;
               text-align: center !important;
+              width: 100% !important;
             }
           </style>
         </head>
@@ -293,7 +312,37 @@ export default function StudentBarcodes() {
     selectedStudentsList.forEach((student) => {
       const classroom = classes.find(c => c.id === student.class_id);
       const scheduleFormatted = formatDisplaySchedule(classroom);
-      const barcodeHtml = document.getElementById(`print-barcode-view-${student.id}`)?.innerHTML || '';
+      
+    
+    const barcodeEl = document.getElementById(`print-barcode-view-${student.id}`);
+    const svgEl = barcodeEl?.querySelector('svg');
+    const imgEl = barcodeEl?.querySelector('img');
+    const spanEl = barcodeEl?.querySelector('span');
+    
+    let barcodeHtml = '';
+    
+    if (svgEl && imgEl) {
+       barcodeHtml = `<div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 2mm; width: 100%;">
+         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
+           ${svgEl.outerHTML}
+           ${spanEl ? `<span>${spanEl.innerText}</span>` : ''}
+         </div>
+         <div style="display: flex; align-items: center; justify-content: center;">
+           ${imgEl.outerHTML}
+         </div>
+       </div>`;
+    } else if (svgEl) {
+       barcodeHtml = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+         ${svgEl.outerHTML}
+         ${spanEl ? `<span>${spanEl.innerText}</span>` : ''}
+       </div>`;
+    } else if (imgEl) {
+       barcodeHtml = `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+         ${imgEl.outerHTML}
+         ${spanEl ? `<span>${spanEl.innerText}</span>` : ''}
+       </div>`;
+    }
+
 
       labelsHtml += `
         <div class="label-container">
@@ -421,7 +470,7 @@ export default function StudentBarcodes() {
             }
             .barcode-wrapper {
               width: 100%;
-              height: 11mm;
+              height: 14mm;
               display: flex;
               flex-direction: row;
               align-items: center;
@@ -429,28 +478,16 @@ export default function StudentBarcodes() {
               margin-top: 0.4mm;
               direction: ltr !important;
             }
-            .barcode-wrapper > div {
-              background-color: #ffffff !important;
-              border: none !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              width: 100% !important;
-              box-shadow: none !important;
-            }
-            .barcode-wrapper > div > div {
-              display: flex !important;
-              flex-direction: row !important;
-              align-items: center !important;
-              justify-content: center !important;
-              gap: 2mm !important;
-              width: 100% !important;
-              direction: ltr !important;
-            }
+            
+            
+            
+            
             .barcode-wrapper svg {
-              height: 8.5mm !important;
-              max-width: 65% !important;
+              height: 11mm !important;
+              width: auto !important;
+              max-width: 100% !important;
               display: block !important;
-              margin: 0 !important;
+              margin: 0 auto !important;
             }
             .barcode-wrapper img {
               height: 9.5mm !important;
@@ -460,14 +497,15 @@ export default function StudentBarcodes() {
             }
             .barcode-wrapper span {
               font-family: monospace !important;
-              font-size: 6px !important;
+              font-size: 7px !important;
               color: #000000 !important;
-              margin-top: 0.5px !important;
-              letter-spacing: 0.5px !important;
+              margin-top: 1mm !important;
+              letter-spacing: 2px !important;
               font-weight: bold !important;
               direction: ltr !important;
               display: block !important;
               text-align: center !important;
+              width: 100% !important;
             }
           </style>
         </head>
