@@ -149,6 +149,7 @@ export default function App() {
 
   // Customized Branding state
   const [customAppName, setCustomAppName] = useState(() => getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
+  const [customAppSubtitle, setCustomAppSubtitle] = useState(() => getTenantSetting('sams_custom_app_subtitle_v2', 'لادارة السناتر التعليمية'));
   const [customAppLogo, setCustomAppLogo] = useState(() => getTenantSetting('sams_custom_app_logo_v2', 'F'));
   const [customHeaderTitle, setCustomHeaderTitle] = useState(() => getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة'));
   const [customHeaderSubtitle, setCustomHeaderSubtitle] = useState(() => getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -425,6 +426,7 @@ export default function App() {
 
   const handleSettingsSaved = () => {
     setCustomAppName(getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
+    setCustomAppSubtitle(getTenantSetting('sams_custom_app_subtitle_v2', 'لادارة السناتر التعليمية'));
     setCustomAppLogo(getTenantSetting('sams_custom_app_logo_v2', 'F'));
     setCustomHeaderTitle(getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة'));
     setCustomHeaderSubtitle(getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -444,6 +446,7 @@ export default function App() {
 
     // Reset local custom names to defaults
     setCustomAppName('Fox System');
+    setCustomAppSubtitle('لادارة السناتر التعليمية');
     setCustomAppLogo('F');
     setCustomHeaderTitle('المنصة التعليمية المتكاملة');
     setCustomHeaderSubtitle('بوابة التحكم الإدارية والحصص الأكاديمية');
@@ -670,6 +673,7 @@ export default function App() {
           }
           // Dynamic brand update upon successful login
           setCustomAppName(getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
+    setCustomAppSubtitle(getTenantSetting('sams_custom_app_subtitle_v2', 'لادارة السناتر التعليمية'));
           setCustomAppLogo(getTenantSetting('sams_custom_app_logo_v2', 'F'));
           setCustomHeaderTitle(getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة'));
           setCustomHeaderSubtitle(getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -717,7 +721,7 @@ export default function App() {
             )}
           </div>
           <h1 className="text-xl font-extrabold text-white tracking-wide">{customAppName}</h1>
-          <p className="text-xs font-semibold text-[#FCF6BA] mt-1.5 px-3 py-1 bg-white/10 rounded-full select-none">لادارة السناتر التعليمية</p>
+          <p className="text-xs font-semibold text-[#FCF6BA] mt-1.5 px-3 py-1 bg-white/10 rounded-full select-none text-center max-w-[90%] break-words">{customAppSubtitle}</p>
         </div>
 
         {isSidebarCollapsed && (

@@ -33,6 +33,7 @@ export default function SettingsManager({
 
   // State variables for customization
   const [appName, setAppName] = useState(() => getTenantSetting('sams_custom_app_name_v2', 'Fox System'));
+  const [appSubtitle, setAppSubtitle] = useState(() => getTenantSetting('sams_custom_app_subtitle_v2', 'لادارة السناتر التعليمية'));
   const [appLogo, setAppLogo] = useState(() => getTenantSetting('sams_custom_app_logo_v2', 'F'));
   const [headerTitle, setHeaderTitle] = useState(() => getTenantSetting('sams_custom_header_title_v2', 'المنصة التعليمية المتكاملة للمعلم'));
   const [headerSubtitle, setHeaderSubtitle] = useState(() => getTenantSetting('sams_custom_header_subtitle_v2', 'بوابة التحكم الإدارية والحصص الأكاديمية'));
@@ -85,6 +86,7 @@ export default function SettingsManager({
       const prefix = tenantId !== 'super-admin' && tenantId !== 'default' ? `${tenantId}_` : '';
 
       saveToStorage('sams_custom_app_name_v2', appName.trim());
+      saveToStorage('sams_custom_app_subtitle_v2', appSubtitle.trim());
       saveToStorage('sams_custom_app_logo_v2', appLogo.trim());
       saveToStorage('sams_custom_header_title_v2', headerTitle.trim());
       saveToStorage('sams_custom_header_subtitle_v2', headerSubtitle.trim());
@@ -241,6 +243,17 @@ export default function SettingsManager({
                 <span className="text-[10px] text-slate-400 block">(الاسم المعروض أعلى الشريط اليمين والجانبي)</span>
               </div>
 
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">وصف التطبيق الفرعي (أسفل الاسم):</label>
+                <input
+                  type="text"
+                  value={appSubtitle}
+                  onChange={(e) => setAppSubtitle(e.target.value)}
+                  placeholder="لادارة السناتر التعليمية"
+                  className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-lg text-right outline-none focus:border-[#0D5C8C] shadow-3xs"
+                />
+                <span className="text-[10px] text-slate-400 block">(الوصف المصغر أسفل اسم السنتر)</span>
+              </div>
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-700">شعار السنتر (اللوجو):</label>
                 <div className="flex items-center gap-3">
