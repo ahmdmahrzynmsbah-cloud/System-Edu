@@ -188,9 +188,10 @@ export default function StudentBarcodes() {
               font-size: 6.5px;
               font-weight: bold;
               color: #333333;
-              white-space: nowrap;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
               overflow: hidden;
-              text-overflow: ellipsis;
               margin: 0;
               direction: rtl !important;
               line-height: 1.2;
@@ -258,7 +259,7 @@ export default function StudentBarcodes() {
               <div class="student-info">
                 <div class="student-name">${student.name}</div>
                 <div class="meta-row">المجموعة: <span>${classroom?.name || 'غير محدد'}</span></div>
-                <div class="meta-row">المواعيد: <span style="font-size: 8px;">${scheduleFormatted}</span></div>
+                <div class="meta-row" style="font-size: 6px;">المواعيد: <span>${scheduleFormatted}</span></div>
               </div>
               <div class="barcode-wrapper" dir="ltr">
                 ${barcodeHtml}
@@ -301,7 +302,7 @@ export default function StudentBarcodes() {
             <div class="student-info">
               <div class="student-name">${student.name}</div>
               <div class="meta-row">المجموعة: <span>${classroom?.name || 'غير محدد'}</span></div>
-              <div class="meta-row">المواعيد: <span style="font-size: 8px;">${scheduleFormatted}</span></div>
+              <div class="meta-row" style="font-size: 6px;">المواعيد: <span>${scheduleFormatted}</span></div>
             </div>
             <div class="barcode-wrapper" dir="ltr">
               ${barcodeHtml}
@@ -406,9 +407,10 @@ export default function StudentBarcodes() {
               font-size: 7px;
               font-weight: bold;
               color: #333333;
-              white-space: nowrap;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
               overflow: hidden;
-              text-overflow: ellipsis;
               margin: 0;
               direction: rtl !important;
               line-height: 1.2;

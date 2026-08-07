@@ -340,7 +340,7 @@ export default function ClassesManager() {
                       </div>
                     </div>
                 )}
-            </div>
+              </div>
         </div>
 
         {/* Student Details Modal */}
@@ -663,12 +663,14 @@ export default function ClassesManager() {
               {/* Attributes */}
               <div className="space-y-2.5 text-xs">
                 
-                <div className="flex items-center justify-between text-slate-600">
-                  <span className="flex items-center gap-1.5 font-sans">
+                <div className="flex flex-col items-start gap-1 text-slate-600">
+                  <span className="flex items-center gap-1.5 font-sans whitespace-nowrap shrink-0">
                     <Calendar className="w-4 h-4 text-slate-400" />
                     مواعيد المجموعة
                   </span>
-                  <span className="font-bold text-slate-800">{cls.schedule_days ? `${cls.schedule_days} - ${cls.schedule_time || ''}` : 'ـ لم تحدد بعد ـ'}</span>
+                  <span className="font-bold text-slate-800 text-[11px] leading-relaxed pr-5" title={formatDisplaySchedule(cls)}>
+                    {formatDisplaySchedule(cls)}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between text-slate-600">
@@ -691,10 +693,7 @@ export default function ClassesManager() {
 
               {/* Subjects in that group list display */}
               <div className="pt-3 border-t border-slate-50 space-y-1.5">
-                <p className="text-[10px] text-slate-400 font-bold uppercase">قائمة المواد الدراسية النشطة بالمجموعة:</p>
-                {currentSubjects.length === 0 ? (
-                  <p className="text-[10px] text-amber-600 italic">يتم تدريس المحاضرات الأساسية حالياً.</p>
-                ) : (
+                {currentSubjects.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {currentSubjects.map(sub => (
                       <span key={sub.id} className="text-[10px] bg-[#0D5C8C]/5 text-[#0D5C8C] border border-[#0D5C8C]/10 px-2 py-0.5 rounded font-medium">
@@ -733,8 +732,8 @@ export default function ClassesManager() {
               <button onClick={() => setIsEditingSchedule(false)} className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg">إلغاء</button>
               <button onClick={() => { if (editingSchedule) { samsDb.saveCenterSchedule(editingSchedule); setSchedule(editingSchedule); setIsEditingSchedule(false); } }} className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><Check className="w-3 h-3"/> حفظ</button>
             </div>
-          )}
-        </div>
+                )}
+              </div>
         
         <p className="text-[11px] text-slate-500 leading-relaxed">
           يتكون الأسبوع الدراسي من أيام وفترات يمكن تخصيصها.
@@ -839,8 +838,8 @@ export default function ClassesManager() {
           </div>
         ) : (
           <div className="text-center p-5 text-slate-500 text-xs">جاري تحميل الجدول...</div>
-        )}
-      </div>
+                )}
+              </div>
 
 
       {/* Archive Confirmation Modal */}
